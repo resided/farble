@@ -57,19 +57,31 @@ export async function fetchNeynarProfiles(usernames: string[]): Promise<Record<s
       .map(u => u.replace('@', ''))
       .filter(u => u !== 'you');
 
-    if (cleanUsernames.length === 0) return profiles;
+    if (cleanUsernames.length === 0) {
+      console.log('No usernames to fetch (all are "you")');
+      return profiles;
+    }
 
     // Fetch profiles through our API route (server-side, uses NEYNAR_API_KEY)
     const usernamesParam = cleanUsernames.join(',');
+    console.log('Fetching Neynar profiles for:', usernamesParam);
+    
     const response = await fetch(
       `/api/neynar/profiles?usernames=${usernamesParam}`
     );
 
     if (response.ok) {
       const data = await response.json();
-      Object.assign(profiles, data.profiles || {});
+      console.log('Neynar API response:', data);
+      if (data.profiles) {
+        Object.assign(profiles, data.profiles);
+        console.log('Loaded profiles:', profiles);
+      } else if (data.error) {
+        console.error('Neynar API error:', data.error);
+      }
     } else {
-      console.warn('Neynar API request failed:', response.status, response.statusText);
+      const errorData = await response.json().catch(() => ({}));
+      console.warn('Neynar API request failed:', response.status, response.statusText, errorData);
     }
   } catch (error) {
     console.error('Error fetching Neynar profiles:', error);

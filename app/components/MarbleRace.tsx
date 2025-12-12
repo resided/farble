@@ -51,12 +51,16 @@ const MarbleRace = () => {
     const loadProfiles = async () => {
       const handles = basePlayers.map(p => p.handle);
       const profiles = await fetchNeynarProfiles(handles);
-      setPlayerPfps(profiles);
+      if (Object.keys(profiles).length > 0) {
+        console.log('Setting player profile pictures:', profiles);
+        setPlayerPfps(profiles);
+      } else {
+        console.warn('No profile pictures loaded. Check NEYNAR_API_KEY is set.');
+      }
     };
 
-    if (screen === 'lobby' || screen === 'racing') {
-      loadProfiles();
-    }
+    // Always load profiles when component mounts or screen changes
+    loadProfiles();
   }, [screen, basePlayers]);
 
   // Merge players with profile pictures

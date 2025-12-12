@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
 
   const apiKey = process.env.NEYNAR_API_KEY;
   if (!apiKey) {
+    console.error('NEYNAR_API_KEY not found in environment variables');
     return NextResponse.json({ error: 'Neynar API key not configured' }, { status: 500 });
   }
 
@@ -33,10 +34,13 @@ export async function GET(request: NextRequest) {
     const data = await response.json();
     const users = data.result?.users || [];
     
+    console.log(`Fetched ${users.length} users from Neynar`);
+    
     const profiles: Record<string, string> = {};
     users.forEach((user: any) => {
       if (user.username && user.pfp_url) {
         profiles[`@${user.username}`] = user.pfp_url;
+        console.log(`Profile for @${user.username}: ${user.pfp_url}`);
       }
     });
 
