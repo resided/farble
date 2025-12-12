@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { useFarcaster } from '../hooks/useFarcaster';
+import { sdk } from '@farcaster/miniapp-sdk';
+import { fetchNeynarProfiles } from '../hooks/useNeynar';
 
 interface Player {
   id: number;
@@ -12,6 +14,7 @@ interface Player {
   colorName: string;
   joined: boolean;
   isYou?: boolean;
+  pfpUrl?: string;
 }
 
 const MarbleRace = () => {
@@ -21,8 +24,12 @@ const MarbleRace = () => {
   const [marblePositions, setMarblePositions] = useState([0, 0, 0, 0, 0]);
   const [winner, setWinner] = useState<Player | null>(null);
   const [winnerFound, setWinnerFound] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
+  const [hasPaid, setHasPaid] = useState(false);
+  const [playerPfps, setPlayerPfps] = useState<Record<string, string>>({});
 
-  const players: Player[] = useMemo(() => [
+  const basePlayers: Player[] = useMemo(() => [
     { 
       id: 1, 
       name: user?.username || 'you', 
@@ -30,7 +37,8 @@ const MarbleRace = () => {
       color: '#FF3B30', 
       colorName: 'Red', 
       joined: true, 
-      isYou: true 
+      isYou: true,
+      pfpUrl: user?.pfpUrl,
     },
     { id: 2, name: 'dwr', handle: '@dwr', color: '#007AFF', colorName: 'Blue', joined: true },
     { id: 3, name: 'vitalik', handle: '@vitalik', color: '#34C759', colorName: 'Mint', joined: true },
@@ -38,8 +46,74 @@ const MarbleRace = () => {
     { id: 5, name: 'ted', handle: '@ted', color: '#AF52DE', colorName: 'Grape', joined: true },
   ], [user]);
 
+  // Fetch profile pictures from Neynar
+  useEffect(() => {
+    const loadProfiles = async () => {
+      const handles = basePlayers.map(p => p.handle);
+      const profiles = await fetchNeynarProfiles(handles);
+      setPlayerPfps(profiles);
+    };
+
+    if (screen === 'lobby' || screen === 'racing') {
+      loadProfiles();
+    }
+  }, [screen, basePlayers]);
+
+  // Merge players with profile pictures
+  const players: Player[] = useMemo(() => {
+    return basePlayers.map(player => ({
+      ...player,
+      pfpUrl: player.pfpUrl || playerPfps[player.handle] || undefined,
+    }));
+  }, [basePlayers, playerPfps]);
+
   const buyIn = '0.001';
   const pot = (players.filter(p => p.joined).length * parseFloat(buyIn)).toFixed(3);
+
+  const handleJoinRace = async () => {
+    if (hasPaid) {
+      startRace();
+      return;
+    }
+
+    try {
+      setIsPaying(true);
+      setPaymentStatus('Connecting wallet...');
+
+      // TODO: Implement real onchain payment
+      // 1. Connect to user's wallet using Farcaster SDK
+      // 2. Send transaction to your smart contract
+      // 3. Wait for confirmation
+      // 
+      // Example implementation (needs your contract address):
+      // const context = await sdk.context;
+      // const buyInWei = Math.floor(parseFloat(buyIn) * 1e18).toString();
+      // const result = await sdk.actions.ethereum?.sendTransaction({
+      //   to: 'YOUR_CONTRACT_ADDRESS',
+      //   value: buyInWei,
+      //   data: '0x...', // Encoded function call
+      //   chainId: 8453, // Base
+      // });
+      
+      // For now, simulate payment flow
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      setPaymentStatus('Payment confirmed!');
+      setHasPaid(true);
+      
+      // Start race after payment
+      setTimeout(() => {
+        startRace();
+        setIsPaying(false);
+        setPaymentStatus(null);
+      }, 1000);
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      setPaymentStatus(error?.message || 'Payment failed. Please try again.');
+      setIsPaying(false);
+      setTimeout(() => setPaymentStatus(null), 3000);
+    }
+  };
 
   useEffect(() => {
     if (screen === 'racing' && !winnerFound) {
@@ -134,13 +208,26 @@ const MarbleRace = () => {
                 className={`bg-white rounded-2xl p-3 flex flex-col items-center gap-2 transition-all ${player.isYou ? 'ring-2 ring-blue-500' : ''} ${player.joined ? 'shadow-sm' : ''}`}
               >
                 <div 
-                  className="w-9 h-9 rounded-full"
+                  className="w-9 h-9 rounded-full overflow-hidden relative"
                   style={{ 
-                    backgroundColor: player.color,
+                    backgroundColor: player.pfpUrl ? 'transparent' : player.color,
+                    backgroundImage: player.pfpUrl ? `url(${player.pfpUrl})` : undefined,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
                     opacity: player.joined ? 1 : 0.3,
-                    boxShadow: player.joined ? '0 4px 12px rgba(0,0,0,0.15), inset 0 -4px 8px rgba(0,0,0,0.1), inset 0 4px 8px rgba(255,255,255,0.4)' : 'none'
+                    boxShadow: player.joined ? '0 4px 12px rgba(0,0,0,0.15), inset 0 -4px 8px rgba(0,0,0,0.1), inset 0 4px 8px rgba(255,255,255,0.4)' : 'none',
+                    border: player.pfpUrl ? `2px solid ${player.color}` : 'none',
                   }} 
-                />
+                >
+                  {player.pfpUrl && (
+                    <div 
+                      className="absolute inset-0 rounded-full"
+                      style={{
+                        background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2) 0%, transparent 60%)`,
+                      }}
+                    />
+                  )}
+                </div>
                 <span className="text-[10px] text-neutral-400 font-medium text-center truncate w-full">
                   {player.joined ? player.handle : 'waiting'}
                 </span>
@@ -163,12 +250,28 @@ const MarbleRace = () => {
               Copy Invite
             </button>
             <button 
-              className="flex-1 py-4 px-6 rounded-xl bg-black text-white text-sm font-semibold hover:bg-neutral-800 transition-colors"
-              onClick={startRace}
+              className="flex-1 py-4 px-6 rounded-xl bg-black text-white text-sm font-semibold hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+              onClick={handleJoinRace}
+              disabled={isPaying}
             >
-              Start Race
+              {isPaying ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  {paymentStatus || 'Processing...'}
+                </span>
+              ) : hasPaid ? (
+                'Start Race'
+              ) : (
+                `Join Race (${buyIn} ETH)`
+              )}
             </button>
           </div>
+          
+          {paymentStatus && (
+            <div className={`text-xs text-center mb-2 ${paymentStatus.includes('failed') ? 'text-red-500' : 'text-green-500'}`}>
+              {paymentStatus}
+            </div>
+          )}
 
           <p className="text-xs text-neutral-300">Race starts when lobby is full</p>
         </main>
@@ -185,28 +288,114 @@ const MarbleRace = () => {
       {/* Racing Screen */}
       {screen === 'racing' && (
         <main className="flex-1 px-6 flex flex-col items-center">
-          <div className="w-full bg-white rounded-3xl p-6 shadow-md mt-4 mb-5">
-            <div className="relative flex flex-col gap-4">
-              {players.map((player, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="flex-1 h-2 bg-neutral-100 rounded-full relative overflow-visible">
-                    <div 
-                      className="absolute w-6 h-6 rounded-full top-1/2 -mt-3 transition-all duration-75"
-                      style={{ 
-                        backgroundColor: player.color,
-                        left: `calc(${Math.min(marblePositions[i], 95)}% - 12px)`,
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.2), inset 0 -2px 4px rgba(0,0,0,0.1), inset 0 2px 4px rgba(255,255,255,0.4)',
-                        transform: `rotate(${marblePositions[i] * 8}deg)`
-                      }}
-                    >
-                      <div className="absolute w-2 h-2 rounded-full bg-white/60 top-1 left-1" />
+          <div className="w-full bg-gradient-to-br from-white to-neutral-50 rounded-3xl p-6 shadow-xl mt-4 mb-5 border border-neutral-200/50 relative overflow-hidden">
+            {/* Animated background gradient */}
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-pink-500/5 animate-pulse" />
+            
+            <div className="relative flex flex-col gap-5">
+              {players.map((player, i) => {
+                const position = marblePositions[i];
+                const isLeading = position === Math.max(...marblePositions);
+                return (
+                  <div key={i} className="flex items-center gap-3">
+                    {/* Enhanced track with gradient and checkered pattern */}
+                    <div className="flex-1 h-3 bg-gradient-to-r from-neutral-100 via-neutral-50 to-neutral-100 rounded-full relative overflow-visible border border-neutral-200/30">
+                      {/* Track surface pattern */}
+                      <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,rgba(0,0,0,0.02)_50%,transparent_100%)] rounded-full" />
+                      
+                      {/* Motion blur trail */}
+                      {position > 5 && (
+                        <div 
+                          className="absolute h-3 rounded-full opacity-30 blur-sm transition-all duration-75"
+                          style={{ 
+                            backgroundColor: player.color,
+                            left: `calc(${Math.max(0, position - 8)}% - 12px)`,
+                            width: '24px',
+                          }}
+                        />
+                      )}
+                      
+                      {/* Marble with enhanced effects and profile picture */}
+                      <div 
+                        className="absolute w-7 h-7 rounded-full top-1/2 -mt-3.5 transition-all duration-75 z-10 overflow-hidden"
+                        style={{ 
+                          backgroundColor: player.pfpUrl ? 'transparent' : player.color,
+                          backgroundImage: player.pfpUrl ? `url(${player.pfpUrl})` : undefined,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          left: `calc(${Math.min(position, 95)}% - 14px)`,
+                          boxShadow: isLeading 
+                            ? `0 4px 20px ${player.color}80, 0 2px 8px rgba(0,0,0,0.3), inset 0 -3px 6px rgba(0,0,0,0.2), inset 0 3px 6px rgba(255,255,255,0.5)`
+                            : '0 2px 12px rgba(0,0,0,0.25), inset 0 -2px 4px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.4)',
+                          transform: `rotate(${position * 12}deg) scale(${isLeading ? 1.1 : 1})`,
+                          filter: isLeading ? 'brightness(1.1)' : 'none',
+                          border: player.pfpUrl ? `2px solid ${player.color}` : 'none',
+                        }}
+                      >
+                        {/* Profile picture overlay with marble effect */}
+                        {player.pfpUrl && (
+                          <>
+                            <div 
+                              className="absolute inset-0 rounded-full"
+                              style={{
+                                background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3) 0%, transparent 50%)`,
+                              }}
+                            />
+                            <div 
+                              className="absolute inset-0 rounded-full"
+                              style={{
+                                background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.2) 0%, transparent 50%)`,
+                              }}
+                            />
+                          </>
+                        )}
+                        {/* Marble highlight (only if no pfp) */}
+                        {!player.pfpUrl && (
+                          <>
+                            <div className="absolute w-3 h-3 rounded-full bg-white/70 top-1.5 left-1.5 blur-[1px]" />
+                            <div className="absolute w-2 h-2 rounded-full bg-white/50 top-0.5 left-0.5" />
+                          </>
+                        )}
+                        {/* Leading indicator */}
+                        {isLeading && position < 100 && (
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-ping z-20" />
+                        )}
+                      </div>
+                      
+                      {/* Speed lines effect */}
+                      {position > 10 && position < 100 && (
+                        <div 
+                          className="absolute h-3 w-8 opacity-20"
+                          style={{ 
+                            left: `calc(${position - 5}% - 16px)`,
+                            background: `linear-gradient(90deg, transparent, ${player.color}, transparent)`,
+                          }}
+                        />
+                      )}
                     </div>
+                    <span className={`text-xs font-medium w-16 text-right truncate transition-colors ${isLeading ? 'text-black font-semibold' : 'text-neutral-400'}`}>
+                      {player.handle}
+                    </span>
                   </div>
-                  <span className="text-xs text-neutral-400 font-medium w-16 text-right truncate">{player.handle}</span>
-                </div>
-              ))}
-              {/* Finish line */}
-              <div className="absolute right-16 top-0 bottom-0 w-0.5 bg-black rounded-full" />
+                );
+              })}
+              
+              {/* Enhanced finish line with checkered pattern */}
+              <div className="absolute right-12 top-0 bottom-0 w-1 flex flex-col">
+                {[...Array(20)].map((_, i) => (
+                  <div 
+                    key={i}
+                    className="flex-1"
+                    style={{
+                      backgroundColor: i % 2 === 0 ? '#000' : '#fff',
+                    }}
+                  />
+                ))}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/20 to-transparent" />
+              </div>
+              
+              {/* Finish line glow */}
+              <div className="absolute right-12 top-0 bottom-0 w-0.5 bg-gradient-to-b from-transparent via-yellow-400 to-transparent opacity-60 blur-sm" />
             </div>
           </div>
 
@@ -221,10 +410,14 @@ const MarbleRace = () => {
               <div key={player.id} className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-xl">
                 <span className="text-sm font-bold text-neutral-300 w-5">{rank + 1}</span>
                 <div 
-                  className="w-5 h-5 rounded-full"
+                  className="w-5 h-5 rounded-full overflow-hidden"
                   style={{ 
-                    backgroundColor: player.color,
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                    backgroundColor: player.pfpUrl ? 'transparent' : player.color,
+                    backgroundImage: player.pfpUrl ? `url(${player.pfpUrl})` : undefined,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                    border: player.pfpUrl ? `1px solid ${player.color}` : 'none',
                   }}
                 />
                 <span className="text-sm font-medium text-black">{player.handle}</span>
@@ -244,13 +437,26 @@ const MarbleRace = () => {
               style={{ background: `radial-gradient(circle, ${winner.color}33 0%, transparent 70%)` }}
             />
             <div 
-              className="w-20 h-20 rounded-full relative"
+              className="w-20 h-20 rounded-full relative overflow-hidden"
               style={{ 
-                backgroundColor: winner.color,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 -8px 16px rgba(0,0,0,0.1), inset 0 8px 16px rgba(255,255,255,0.4)'
+                backgroundColor: winner.pfpUrl ? 'transparent' : winner.color,
+                backgroundImage: winner.pfpUrl ? `url(${winner.pfpUrl})` : undefined,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 -8px 16px rgba(0,0,0,0.1), inset 0 8px 16px rgba(255,255,255,0.4)',
+                border: winner.pfpUrl ? `3px solid ${winner.color}` : 'none',
               }}
             >
-              <div className="absolute w-6 h-6 rounded-full bg-white/50 top-3 left-3" />
+              {winner.pfpUrl ? (
+                <div 
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3) 0%, transparent 60%)`,
+                  }}
+                />
+              ) : (
+                <div className="absolute w-6 h-6 rounded-full bg-white/50 top-3 left-3" />
+              )}
             </div>
           </div>
           
