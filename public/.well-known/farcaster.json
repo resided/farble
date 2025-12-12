@@ -1,17 +1,31 @@
 {
-  "miniapp": {
+  "frame": {
+    "name": "Farble",
     "version": "1",
-    "name": "Marble Race",
-    "description": "An on-chain marble racing game built on Base. Race marbles, place your bet, and watch the race unfold.",
-    "iconUrl": "https://farble.vercel.app/icon.png",
+    "iconUrl": "https://farble.vercel.app/logo.png",
     "homeUrl": "https://farble.vercel.app",
-    "canonicalDomain": "farble.vercel.app",
-    "requiredChains": ["eip155:8453"],
-    "tags": ["game", "onchain", "racing", "base"],
-    "requiredCapabilities": [
-      "actions.ready",
-      "actions.signIn"
-    ]
+    "imageUrl": "https://farble.vercel.app/logo.png",
+    "buttonTitle": "Farble",
+    "splashImageUrl": "https://farble.vercel.app/logo.png",
+    "splashBackgroundColor": "#ffffff",
+    "webhookUrl": "https://farble.vercel.app/api/webhook",
+    "subtitle": "onchain marbles",
+    "description": "Onchain marble races, play and win",
+    "screenshotUrls": [
+      "https://farble.vercel.app/logo.png"
+    ],
+    "primaryCategory": "games",
+    "tags": [
+      "gaming",
+      "social"
+    ],
+    "heroImageUrl": "https://farble.vercel.app/logo.png",
+    "tagline": "Play and win",
+    "ogImageUrl": "https://farble.vercel.app/logo.png"
+  },
+  "accountAssociation": {
+    "header": "eyJmaWQiOjM0MjQzMywidHlwZSI6ImF1dGgiLCJrZXkiOiIweDlGYUEzZWMxNjZDMjlCOTU0MjZENWJiQjc5RDNCNDVBZDUxQ0QxYzIifQ",
+    "payload": "eyJkb21haW4iOiJmYXJibGUudmVyY2VsLmFwcCJ9",
+    "signature": "+AFZzVEFRzVqj0e8IvP6hWribTKEQWSPEd38+JINPwFuII16s7fo1pLCSpi1qh/gdIaKifZ1/0XbmRUMVU6pkxs="
   }
 }
-
