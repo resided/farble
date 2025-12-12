@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { sdk } from '@farcaster/miniapp-sdk';
 
 interface FarcasterUser {
   fid: number;
@@ -14,33 +15,41 @@ export function useFarcaster() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if we're in a Farcaster environment
-    if (typeof window !== 'undefined') {
-      // Try to get user data from Farcaster context
-      // This will be available when running in Farcaster client
-      const farcasterContext = (window as any).farcaster;
-      
-      if (farcasterContext) {
-        // Get user data from Farcaster SDK
-        farcasterContext.getUser?.()
-          .then((userData: FarcasterUser) => {
-            setUser(userData);
-            setLoading(false);
-          })
-          .catch(() => {
-            setLoading(false);
+    const initializeFarcaster = async () => {
+      try {
+        // Get user data from Farcaster context
+        // Note: sdk.actions.ready() is called by FarcasterProvider
+        const context = await sdk.context;
+        if (context?.user) {
+          const userData = context.user;
+          setUser({
+            fid: userData.fid,
+            username: userData.username || userData.displayName?.toLowerCase() || 'user',
+            displayName: userData.displayName || userData.username || 'User',
+            pfpUrl: (userData as any).pfp?.url,
           });
-      } else {
-        // Fallback for development/testing
-        // In production, this would come from Farcaster
+        } else {
+          // Fallback for development/testing or when not in Farcaster client
+          setUser({
+            fid: 1,
+            username: 'you',
+            displayName: 'You',
+          });
+        }
+      } catch (error) {
+        // If SDK is not available (e.g., not in Farcaster client), use fallback data
+        console.log('Farcaster SDK not available, using fallback:', error);
         setUser({
           fid: 1,
           username: 'you',
           displayName: 'You',
         });
+      } finally {
         setLoading(false);
       }
-    }
+    };
+
+    initializeFarcaster();
   }, []);
 
   return { user, loading };

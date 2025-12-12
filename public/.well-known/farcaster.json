@@ -1,0 +1,17 @@
+{
+  "miniapp": {
+    "version": "1",
+    "name": "Marble Race",
+    "description": "An on-chain marble racing game built on Base. Race marbles, place your bet, and watch the race unfold.",
+    "iconUrl": "https://farble.vercel.app/icon.png",
+    "homeUrl": "https://farble.vercel.app",
+    "canonicalDomain": "farble.vercel.app",
+    "requiredChains": ["eip155:8453"],
+    "tags": ["game", "onchain", "racing", "base"],
+    "requiredCapabilities": [
+      "actions.ready",
+      "actions.signIn"
+    ]
+  }
+}
+
