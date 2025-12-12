@@ -102,7 +102,7 @@ const MarbleRace = () => {
       <header className="px-6 py-5 flex items-center gap-2.5 relative z-10">
         <div className="relative w-6 h-6 flex-shrink-0">
           <Image 
-            src="/farble.png" 
+            src="/logo.png" 
             alt="FARBLE" 
             width={24}
             height={24}
