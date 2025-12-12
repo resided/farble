@@ -289,17 +289,17 @@ const MarbleRace = () => {
             <span className="text-3xl font-bold text-black tracking-tight">{buyIn} ETH</span>
           </div>
 
-          {/* Horse race style lineup */}
+          {/* Vertical bullet-point style player list */}
           <div className="w-full bg-white rounded-3xl p-4 shadow-md mb-6">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-2">
               {players.map((player, i) => (
                 <div 
                   key={i} 
-                  className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-xl transition-all ${player.isYou ? 'bg-blue-50 ring-2 ring-blue-500' : 'bg-neutral-50'} ${player.joined ? '' : 'opacity-40'}`}
+                  className={`flex items-center gap-3 p-3 rounded-xl transition-all ${player.isYou ? 'bg-blue-50 ring-2 ring-blue-500' : 'bg-neutral-50'} ${player.joined ? '' : 'opacity-40'}`}
                 >
-                  {/* Marble with profile picture - larger and clearer */}
+                  {/* Bullet point - marble */}
                   <div 
-                    className="w-16 h-16 rounded-full overflow-hidden relative flex-shrink-0"
+                    className="w-12 h-12 rounded-full overflow-hidden relative flex-shrink-0"
                     style={{ 
                       backgroundColor: player.pfpUrl ? 'transparent' : player.color,
                       backgroundImage: player.pfpUrl ? `url(${player.pfpUrl})` : undefined,
@@ -336,13 +336,13 @@ const MarbleRace = () => {
                       </div>
                     )}
                   </div>
-                  {/* Username - clear and full width */}
-                  <div className="w-full flex flex-col items-center gap-1">
-                    <span className={`text-sm font-bold text-center break-all ${player.joined ? 'text-black' : 'text-neutral-400'}`}>
+                  {/* Username and color - horizontal layout */}
+                  <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+                    <span className={`text-sm font-bold ${player.joined ? 'text-black' : 'text-neutral-400'} truncate`}>
                       {player.joined ? player.handle : 'waiting'}
                     </span>
                     {player.joined && (
-                      <span className="text-[10px] text-neutral-500 font-medium uppercase tracking-wide">
+                      <span className="text-xs text-neutral-500 font-medium uppercase tracking-wide">
                         {player.colorName}
                       </span>
                     )}
