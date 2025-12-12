@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Image from 'next/image';
 import { useFarcaster } from '../hooks/useFarcaster';
 
 interface Player {
@@ -99,9 +100,15 @@ const MarbleRace = () => {
       
       {/* Header */}
       <header className="px-6 py-5 flex items-center gap-2.5 relative z-10">
-        <div className="relative w-6 h-6">
-          <div className="absolute w-4 h-4 rounded-full bg-black top-0 left-0" />
-          <div className="absolute w-3 h-3 rounded-full bg-blue-500 bottom-0 right-0" />
+        <div className="relative w-6 h-6 flex-shrink-0">
+          <Image 
+            src="/farble.png" 
+            alt="FARBLE" 
+            width={24}
+            height={24}
+            className="object-contain"
+            priority
+          />
         </div>
         <span className="text-lg font-semibold text-black tracking-tight">marble</span>
         {screen !== 'lobby' && (
