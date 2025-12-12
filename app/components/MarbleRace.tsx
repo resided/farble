@@ -261,7 +261,7 @@ const MarbleRace = () => {
       <div className="absolute top-0 left-0 right-0 h-96 bg-gradient-to-b from-black/[0.02] to-transparent pointer-events-none" />
       
       {/* Header */}
-      <header className="px-6 py-5 flex items-center gap-2.5 relative z-10">
+      <header className="px-6 py-4 flex items-center gap-2.5 relative z-10">
         <div className="relative w-6 h-6 flex-shrink-0">
           <Image 
             src="/logo.png" 
@@ -273,7 +273,29 @@ const MarbleRace = () => {
           />
         </div>
         <span className="text-lg font-semibold text-black tracking-tight">farble</span>
-        {screen !== 'lobby' && (
+        {screen === 'lobby' ? (
+          <div className="ml-auto flex items-center gap-2">
+            <button className="px-4 py-2 rounded-lg bg-neutral-100 text-black text-sm font-semibold hover:bg-neutral-200 transition-colors">
+              Copy Invite
+            </button>
+            <button 
+              className="px-4 py-2 rounded-lg bg-black text-white text-sm font-semibold hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+              onClick={handleJoinRace}
+              disabled={isPaying}
+            >
+              {isPaying ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span className="text-xs">{paymentStatus || 'Processing...'}</span>
+                </span>
+              ) : hasPaid ? (
+                'Start Race'
+              ) : (
+                `Join (${buyIn} ETH)`
+              )}
+            </button>
+          </div>
+        ) : (
           <div className="ml-auto flex items-center gap-1.5 bg-neutral-100 px-3 py-1.5 rounded-full">
             <span className="text-xs text-neutral-400 font-medium">pot</span>
             <span className="text-sm font-semibold text-black">{pot} ETH</span>
@@ -298,41 +320,49 @@ const MarbleRace = () => {
                   className={`flex items-center gap-3 p-3 rounded-xl transition-all ${player.isYou ? 'bg-blue-50 ring-2 ring-blue-500' : 'bg-neutral-50'} ${player.joined ? '' : 'opacity-40'}`}
                 >
                   {/* Bullet point - marble */}
-                  <div 
-                    className="w-12 h-12 rounded-full overflow-hidden relative flex-shrink-0"
-                    style={{ 
-                      backgroundColor: player.pfpUrl ? 'transparent' : player.color,
-                      backgroundImage: player.pfpUrl ? `url(${player.pfpUrl})` : undefined,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      boxShadow: player.joined 
-                        ? '0 4px 16px rgba(0,0,0,0.2), inset 0 -4px 8px rgba(0,0,0,0.15), inset 0 4px 8px rgba(255,255,255,0.5)' 
-                        : 'none',
-                      border: player.pfpUrl ? `3px solid ${player.color}` : 'none',
-                    }} 
-                  >
-                    {player.pfpUrl && (
-                      <>
-                        {/* Marble shine effect */}
-                        <div 
-                          className="absolute inset-0 rounded-full"
-                          style={{
-                            background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 60%)`,
+                  <div className="relative flex-shrink-0">
+                    <div 
+                      className="w-12 h-12 rounded-full overflow-hidden relative"
+                      style={{ 
+                        backgroundColor: player.color,
+                        boxShadow: player.joined 
+                          ? '0 4px 16px rgba(0,0,0,0.2), inset 0 -4px 8px rgba(0,0,0,0.15), inset 0 4px 8px rgba(255,255,255,0.5)' 
+                          : 'none',
+                        border: player.pfpUrl ? `3px solid ${player.color}` : 'none',
+                      }}
+                    >
+                      {/* Profile picture or color fallback */}
+                      {player.pfpUrl ? (
+                        <img
+                          src={player.pfpUrl}
+                          alt={player.handle}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Hide the image if it fails to load, showing the color background instead
+                            e.currentTarget.style.display = 'none';
                           }}
                         />
-                        {/* Marble shadow effect */}
-                        <div 
-                          className="absolute inset-0 rounded-full"
-                          style={{
-                            background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.2) 0%, transparent 60%)`,
-                          }}
-                        />
-                      </>
-                    )}
-                    {/* You indicator */}
+                      ) : null}
+                      
+                      {/* Marble shine effect */}
+                      <div 
+                        className="absolute inset-0 rounded-full pointer-events-none"
+                        style={{
+                          background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 60%)`,
+                        }}
+                      />
+                      {/* Marble shadow effect */}
+                      <div 
+                        className="absolute inset-0 rounded-full pointer-events-none"
+                        style={{
+                          background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.2) 0%, transparent 60%)`,
+                        }}
+                      />
+                    </div>
+                    {/* You indicator - positioned outside the circle to avoid clipping */}
                     {player.isYou && (
-                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-[10px] font-bold">YOU</span>
+                      <div className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow-md border-2 border-white z-10">
+                        <span className="text-white text-[9px] font-bold leading-none">YOU</span>
                       </div>
                     )}
                   </div>
@@ -352,37 +382,15 @@ const MarbleRace = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 mb-8">
+          <div className="flex items-center gap-2 mb-6">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             <span className="text-sm text-neutral-400 font-medium">
               {players.filter(p => p.joined).length} / 5 players
             </span>
           </div>
-
-          <div className="flex gap-3 w-full mb-4">
-            <button className="flex-1 py-4 px-6 rounded-xl bg-neutral-100 text-black text-sm font-semibold hover:bg-neutral-200 transition-colors">
-              Copy Invite
-            </button>
-            <button 
-              className="flex-1 py-4 px-6 rounded-xl bg-black text-white text-sm font-semibold hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
-              onClick={handleJoinRace}
-              disabled={isPaying}
-            >
-              {isPaying ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  {paymentStatus || 'Processing...'}
-                </span>
-              ) : hasPaid ? (
-                'Start Race'
-              ) : (
-                `Join Race (${buyIn} ETH)`
-              )}
-            </button>
-          </div>
           
           {paymentStatus && (
-            <div className={`text-xs text-center mb-2 ${paymentStatus.includes('failed') ? 'text-red-500' : 'text-green-500'}`}>
+            <div className={`text-xs text-center mb-4 ${paymentStatus.includes('failed') ? 'text-red-500' : 'text-green-500'}`}>
               {paymentStatus}
             </div>
           )}
