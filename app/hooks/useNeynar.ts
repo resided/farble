@@ -66,22 +66,31 @@ export async function fetchNeynarProfiles(usernames: string[]): Promise<Record<s
     const usernamesParam = cleanUsernames.join(',');
     console.log('Fetching Neynar profiles for:', usernamesParam);
     
-    const response = await fetch(
-      `/api/neynar/profiles?usernames=${usernamesParam}`
-    );
+    if (!usernamesParam || usernamesParam.trim() === '') {
+      console.warn('No usernames to fetch after cleaning');
+      return profiles;
+    }
+    
+    try {
+      const response = await fetch(
+        `/api/neynar/profiles?usernames=${encodeURIComponent(usernamesParam)}`
+      );
 
-    if (response.ok) {
-      const data = await response.json();
-      console.log('Neynar API response:', data);
-      if (data.profiles) {
-        Object.assign(profiles, data.profiles);
-        console.log('Loaded profiles:', profiles);
-      } else if (data.error) {
-        console.error('Neynar API error:', data.error);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Neynar API response:', data);
+        if (data.profiles) {
+          Object.assign(profiles, data.profiles);
+          console.log('Loaded profiles:', profiles);
+        } else if (data.error) {
+          console.error('Neynar API error:', data.error);
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.warn('Neynar API request failed:', response.status, response.statusText, errorData);
       }
-    } else {
-      const errorData = await response.json().catch(() => ({}));
-      console.warn('Neynar API request failed:', response.status, response.statusText, errorData);
+    } catch (error) {
+      console.error('Network error fetching Neynar profiles:', error);
     }
   } catch (error) {
     console.error('Error fetching Neynar profiles:', error);

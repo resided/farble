@@ -46,16 +46,17 @@ const MarbleRace = () => {
     { id: 5, name: 'ted', handle: '@ted', color: '#AF52DE', colorName: 'Grape', joined: true },
   ], [user]);
 
-  // Fetch profile pictures from Neynar for other players (not the current user)
+  // Fetch profile pictures from Neynar for ALL players (including current user)
   useEffect(() => {
     const loadProfiles = async () => {
-      // Only fetch profiles for other players, not the current user
-      // The current user's profile comes from Farcaster context
-      const otherPlayers = basePlayers.filter(p => !p.isYou && p.joined);
-      const handles = otherPlayers.map(p => p.handle);
+      // Fetch profiles for all players who have joined, including current user
+      // This ensures we get profile pictures from Neynar using usernames/FIDs
+      const allPlayers = basePlayers.filter(p => p.joined);
+      const handles = allPlayers.map(p => p.handle);
       
       if (handles.length === 0) return;
       
+      console.log('Fetching profile pictures for all players:', handles);
       const profiles = await fetchNeynarProfiles(handles);
       if (Object.keys(profiles).length > 0) {
         console.log('Setting player profile pictures:', profiles);
@@ -69,21 +70,17 @@ const MarbleRace = () => {
     loadProfiles();
   }, [screen, basePlayers]);
 
-  // Merge players with profile pictures
-  // Current user gets pfpUrl from Farcaster context, others from Neynar
+  // Merge players with profile pictures from Neynar
   const players: Player[] = useMemo(() => {
     return basePlayers.map(player => {
-      // Current user: use pfpUrl from Farcaster context
-      if (player.isYou) {
-        return {
-          ...player,
-          pfpUrl: user?.pfpUrl || player.pfpUrl,
-        };
-      }
-      // Other players: use pfpUrl from Neynar fetch
+      // All players get pfpUrl from Neynar fetch (using their username/FID)
+      // Fallback to Farcaster context pfpUrl for current user if Neynar doesn't have it
+      const neynarPfp = playerPfps[player.handle];
+      const farcasterPfp = player.isYou ? user?.pfpUrl : undefined;
+      
       return {
         ...player,
-        pfpUrl: playerPfps[player.handle] || undefined,
+        pfpUrl: neynarPfp || farcasterPfp || undefined,
       };
     });
   }, [basePlayers, playerPfps, user?.pfpUrl]);
@@ -205,7 +202,7 @@ const MarbleRace = () => {
             priority
           />
         </div>
-        <span className="text-lg font-semibold text-black tracking-tight">marble</span>
+        <span className="text-lg font-semibold text-black tracking-tight">farble</span>
         {screen !== 'lobby' && (
           <div className="ml-auto flex items-center gap-1.5 bg-neutral-100 px-3 py-1.5 rounded-full">
             <span className="text-xs text-neutral-400 font-medium">pot</span>
@@ -222,39 +219,55 @@ const MarbleRace = () => {
             <span className="text-3xl font-bold text-black tracking-tight">{buyIn} ETH</span>
           </div>
 
-          <div className="grid grid-cols-5 gap-2 w-full mb-6">
+          <div className="grid grid-cols-5 gap-3 w-full mb-6">
             {players.map((player, i) => (
               <div 
                 key={i} 
-                className={`bg-white rounded-2xl p-3 flex flex-col items-center gap-2 transition-all ${player.isYou ? 'ring-2 ring-blue-500' : ''} ${player.joined ? 'shadow-sm' : ''}`}
+                className={`bg-white rounded-2xl p-4 flex flex-col items-center gap-2.5 transition-all ${player.isYou ? 'ring-2 ring-blue-500' : ''} ${player.joined ? 'shadow-sm' : 'opacity-50'}`}
               >
+                {/* Marble with profile picture */}
                 <div 
-                  className="w-9 h-9 rounded-full overflow-hidden relative"
+                  className="w-12 h-12 rounded-full overflow-hidden relative flex-shrink-0"
                   style={{ 
                     backgroundColor: player.pfpUrl ? 'transparent' : player.color,
                     backgroundImage: player.pfpUrl ? `url(${player.pfpUrl})` : undefined,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
-                    opacity: player.joined ? 1 : 0.3,
-                    boxShadow: player.joined ? '0 4px 12px rgba(0,0,0,0.15), inset 0 -4px 8px rgba(0,0,0,0.1), inset 0 4px 8px rgba(255,255,255,0.4)' : 'none',
-                    border: player.pfpUrl ? `2px solid ${player.color}` : 'none',
+                    boxShadow: player.joined 
+                      ? '0 4px 12px rgba(0,0,0,0.15), inset 0 -4px 8px rgba(0,0,0,0.1), inset 0 4px 8px rgba(255,255,255,0.4)' 
+                      : 'none',
+                    border: player.pfpUrl ? `2.5px solid ${player.color}` : 'none',
                   }} 
                 >
                   {player.pfpUrl && (
-                    <div 
-                      className="absolute inset-0 rounded-full"
-                      style={{
-                        background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2) 0%, transparent 60%)`,
-                      }}
-                    />
+                    <>
+                      {/* Marble shine effect */}
+                      <div 
+                        className="absolute inset-0 rounded-full"
+                        style={{
+                          background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3) 0%, transparent 60%)`,
+                        }}
+                      />
+                      {/* Marble shadow effect */}
+                      <div 
+                        className="absolute inset-0 rounded-full"
+                        style={{
+                          background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.15) 0%, transparent 60%)`,
+                        }}
+                      />
+                    </>
                   )}
                 </div>
-                <span className="text-[10px] text-neutral-400 font-medium text-center truncate w-full">
+                {/* Username - clear and readable */}
+                <span className={`text-xs font-semibold text-center truncate w-full ${player.joined ? 'text-black' : 'text-neutral-400'}`}>
                   {player.joined ? player.handle : 'waiting'}
                 </span>
-                <span className="text-[9px] text-neutral-300 font-semibold uppercase tracking-wide">
-                  {player.colorName}
-                </span>
+                {/* Color name - smaller */}
+                {player.joined && (
+                  <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-wide">
+                    {player.colorName}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -350,22 +363,24 @@ const MarbleRace = () => {
                             : '0 2px 12px rgba(0,0,0,0.25), inset 0 -2px 4px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.4)',
                           transform: `rotate(${position * 12}deg) scale(${isLeading ? 1.1 : 1})`,
                           filter: isLeading ? 'brightness(1.1)' : 'none',
-                          border: player.pfpUrl ? `2px solid ${player.color}` : 'none',
+                          border: player.pfpUrl ? `1.5px solid ${player.color}` : 'none',
                         }}
                       >
-                        {/* Profile picture overlay with marble effect */}
+                        {/* Profile picture overlay with marble effect - small and fits inside */}
                         {player.pfpUrl && (
                           <>
+                            {/* Marble shine effect */}
                             <div 
                               className="absolute inset-0 rounded-full"
                               style={{
-                                background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3) 0%, transparent 50%)`,
+                                background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35) 0%, transparent 55%)`,
                               }}
                             />
+                            {/* Marble shadow effect */}
                             <div 
                               className="absolute inset-0 rounded-full"
                               style={{
-                                background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.2) 0%, transparent 50%)`,
+                                background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.2) 0%, transparent 55%)`,
                               }}
                             />
                           </>
