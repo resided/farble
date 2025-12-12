@@ -37,8 +37,8 @@ const MarbleRace = () => {
     { id: 5, name: 'ted', handle: '@ted', color: '#AF52DE', colorName: 'Grape', joined: true },
   ], [user]);
 
-  const buyIn = '0.01';
-  const pot = (players.filter(p => p.joined).length * parseFloat(buyIn)).toFixed(2);
+  const buyIn = '0.001';
+  const pot = (players.filter(p => p.joined).length * parseFloat(buyIn)).toFixed(3);
 
   useEffect(() => {
     if (screen === 'racing' && !winnerFound) {
