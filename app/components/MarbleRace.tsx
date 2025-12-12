@@ -247,19 +247,15 @@ const MarbleRace = () => {
       if (trackPathRef.current) {
         const point = trackPathRef.current.getPointAtLength(distanceAlongPath);
         
-        // Camera follows leading racer, centered in viewport
-        // For snakes and ladders style, we need to track both X and Y
+        // Camera follows leading racer vertically, centered in viewport
         setCameraOffset(prev => {
-          const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 400;
           const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
           
-          // Center the racer in viewport
-          const targetX = Math.max(0, point.x - viewportWidth / 2);
+          // Center the racer vertically in viewport
           const targetY = Math.max(0, point.y - viewportHeight / 2);
           
-          // For now, just track X (horizontal scrolling)
           // Smooth interpolation for camera movement
-          return prev + (targetX - prev) * 0.12;
+          return prev + (targetY - prev) * 0.12;
         });
       }
     }
@@ -688,16 +684,16 @@ const MarbleRace = () => {
           <div 
             className="absolute inset-0 transition-transform duration-100 ease-out"
             style={{
-              transform: `translateX(${-cameraOffset}px) scale(1)`,
+              transform: `translateY(${-cameraOffset}px) scale(1)`,
               willChange: 'transform',
             }}
           >
-            {/* SVG Track - Snakes and Ladders style zigzag path */}
+            {/* SVG Track - Simple vertical path */}
             <svg 
-              className="absolute top-0 left-0"
-              viewBox="0 0 4000 800"
+              className="absolute top-0 left-1/2 -translate-x-1/2"
+              viewBox="0 0 400 4000"
               preserveAspectRatio="none"
-              style={{ width: '4000px', height: '800px' }}
+              style={{ width: '400px', height: '4000px' }}
             >
               <defs>
                 <filter id="trackGlow">
@@ -839,68 +835,9 @@ const MarbleRace = () => {
                 opacity="0.95"
               />
               
-              {/* Grid squares like snakes and ladders board */}
-              {[...Array(7)].map((_, row) => {
-                const y = 150 + row * 100;
-                return (
-                  <g key={row}>
-                    {/* Horizontal grid lines */}
-                    <line
-                      x1="200"
-                      y1={y}
-                      x2="1800"
-                      y2={y}
-                      stroke="rgba(255,255,255,0.1)"
-                      strokeWidth="1"
-                    />
-                    {/* Vertical grid lines */}
-                    {[...Array(17)].map((_, col) => {
-                      const x = 200 + col * 100;
-                      return (
-                        <line
-                          key={col}
-                          x1={x}
-                          y1={y}
-                          x2={x}
-                          y2={y + 100}
-                          stroke="rgba(255,255,255,0.1)"
-                          strokeWidth="1"
-                        />
-                      );
-                    })}
-                  </g>
-                );
-              })}
-              
-              {/* Final straight section grid */}
-              <line
-                x1="1800"
-                y1="700"
-                x2="3800"
-                y2="750"
-                stroke="rgba(255,255,255,0.1)"
-                strokeWidth="1"
-                strokeDasharray="50 50"
-              />
-              
               {/* Track Texture - Subtle road markings */}
               <path
-                d="M 200 150 
-                   L 1800 150 
-                   L 1800 250 
-                   L 200 250 
-                   L 200 350 
-                   L 1800 350 
-                   L 1800 450 
-                   L 200 450 
-                   L 200 550 
-                   L 1800 550 
-                   L 1800 650 
-                   L 200 650 
-                   L 200 700
-                   L 1800 700
-                   L 1800 750
-                   L 3800 750"
+                d="M 200 0 L 200 4000"
                 fill="none"
                 stroke="rgba(255,255,255,0.15)"
                 strokeWidth="84"
@@ -909,7 +846,7 @@ const MarbleRace = () => {
                 opacity="0.5"
               />
               
-              {/* Snakes and Ladders obstacles - positioned at corners */}
+              {/* Obstacles along the track */}
               {trackPathRef.current && pathLength > 0 && [...Array(6)].map((_, i) => {
                 const obstacleProgress = 0.1 + (i * 0.15);
                 if (obstacleProgress >= 1 || !trackPathRef.current) return null;
@@ -948,24 +885,21 @@ const MarbleRace = () => {
                 );
               })}
               
-              {/* Finish Line - At the end of the zigzag track */}
+              {/* Finish Line - At the end of the track */}
               {trackPathRef.current && pathLength > 0 && (() => {
                 const finishPoint = trackPathRef.current.getPointAtLength(pathLength);
-                const prevPoint = trackPathRef.current.getPointAtLength(pathLength - 10);
-                const finishAngle = Math.atan2(finishPoint.y - prevPoint.y, finishPoint.x - prevPoint.x) * 180 / Math.PI;
-                const perpendicularAngle = finishAngle + 90;
                 return (
-                  <g transform={`translate(${finishPoint.x}, ${finishPoint.y}) rotate(${perpendicularAngle})`}>
-                    {/* Finish line base */}
-                    <rect x="-15" y="-300" width="30" height="600" fill="url(#checkerPattern)" opacity="1" />
+                  <g transform={`translate(${finishPoint.x}, ${finishPoint.y})`}>
+                    {/* Finish line base - horizontal line */}
+                    <rect x="-150" y="-15" width="300" height="30" fill="url(#checkerPattern)" opacity="1" />
                     {/* Finish line glow */}
-                    <rect x="-15" y="-300" width="30" height="600" fill="url(#finishGradient)" opacity="0.4" />
+                    <rect x="-150" y="-15" width="300" height="30" fill="url(#finishGradient)" opacity="0.4" />
                     {/* Black border lines */}
-                    <line x1="0" y1="-300" x2="0" y2="300" stroke="#000" strokeWidth="6" opacity="1" />
-                    <line x1="-3" y1="-300" x2="-3" y2="300" stroke="#fff" strokeWidth="2" opacity="0.8" />
-                    <line x1="3" y1="-300" x2="3" y2="300" stroke="#fff" strokeWidth="2" opacity="0.8" />
+                    <line x1="-150" y1="0" x2="150" y2="0" stroke="#000" strokeWidth="6" opacity="1" />
+                    <line x1="-150" y1="-3" x2="150" y2="-3" stroke="#fff" strokeWidth="2" opacity="0.8" />
+                    <line x1="-150" y1="3" x2="150" y2="3" stroke="#fff" strokeWidth="2" opacity="0.8" />
                     {/* Finish flag effect */}
-                    <rect x="5" y="-200" width="20" height="400" fill="url(#finishFlag)" opacity="0.8" />
+                    <rect x="-200" y="-10" width="20" height="400" fill="url(#finishFlag)" opacity="0.8" />
                   </g>
                 );
               })()}
@@ -1004,7 +938,7 @@ const MarbleRace = () => {
             </svg>
             
             {/* Marbles on Track - Positioned using SVG coordinates */}
-            <div className="absolute top-0 left-0" style={{ width: '4000px', height: '800px', pointerEvents: 'none' }}>
+            <div className="absolute top-0 left-1/2 -translate-x-1/2" style={{ width: '400px', height: '4000px', pointerEvents: 'none' }}>
               {players.map((player, i) => {
                 const position = marblePositions[i];
                 const progress = Math.min(position / TRACK_LENGTH, 1);
@@ -1012,20 +946,16 @@ const MarbleRace = () => {
                 
                 // Get exact position on SVG path using getPointAtLength
                 let x = 200;
-                let y = 150;
-                let angle = 0;
+                let y = 0;
+                let angle = 90; // Vertical track, marbles point down
                 
                 if (trackPathRef.current && pathLength > 0) {
                   const distanceAlongPath = progress * pathLength;
                   const point = trackPathRef.current.getPointAtLength(distanceAlongPath);
                   x = point.x;
                   y = point.y;
-                  
-                  // Get angle for proper rotation (get point slightly ahead)
-                  if (distanceAlongPath < pathLength - 1) {
-                    const nextPoint = trackPathRef.current.getPointAtLength(distanceAlongPath + 1);
-                    angle = Math.atan2(nextPoint.y - point.y, nextPoint.x - point.x) * (180 / Math.PI);
-                  }
+                  // Angle is always 90 degrees (straight down) for vertical track
+                  angle = 90;
                 }
                 
                 return (
