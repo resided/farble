@@ -36,6 +36,7 @@ const MarbleRace = () => {
   const [pathLength, setPathLength] = useState(0);
   const [raceTime, setRaceTime] = useState(0); // Race timer for suspense
   const [speedBursts, setSpeedBursts] = useState<Record<number, number>>({}); // Speed burst effects
+  const [ethPriceUsd, setEthPriceUsd] = useState<number | null>(null); // ETH price in USD
 
   const basePlayers: Player[] = useMemo(() => [
     { 
@@ -53,6 +54,34 @@ const MarbleRace = () => {
     { id: 4, name: 'jessepollak', handle: '@jessepollak', color: '#FF9500', colorName: 'Gold', joined: true },
     { id: 5, name: 'ted', handle: '@ted', color: '#AF52DE', colorName: 'Grape', joined: true },
   ], [user]);
+
+  // Fetch ETH price in USD - Live updates
+  useEffect(() => {
+    const fetchEthPrice = async () => {
+      try {
+        // Use CoinGecko API (free, no API key needed)
+        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd', {
+          cache: 'no-store', // Always fetch fresh data
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setEthPriceUsd(data.ethereum?.usd || null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch ETH price:', error);
+        // Retry after a short delay on error
+        setTimeout(fetchEthPrice, 5000);
+      }
+    };
+
+    // Fetch immediately
+    fetchEthPrice();
+    
+    // Refresh price every 10 seconds for live updates
+    const interval = setInterval(fetchEthPrice, 10000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch profile pictures from Neynar for ALL players (including current user)
   useEffect(() => {
@@ -217,11 +246,18 @@ const MarbleRace = () => {
         const point = trackPathRef.current.getPointAtLength(distanceAlongPath);
         
         // Camera follows leading racer, centered in viewport
+        // For snakes and ladders style, we need to track both X and Y
         setCameraOffset(prev => {
           const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 400;
-          const target = Math.max(0, point.x - viewportWidth / 2);
+          const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+          
+          // Center the racer in viewport
+          const targetX = Math.max(0, point.x - viewportWidth / 2);
+          const targetY = Math.max(0, point.y - viewportHeight / 2);
+          
+          // For now, just track X (horizontal scrolling)
           // Smooth interpolation for camera movement
-          return prev + (target - prev) * 0.12;
+          return prev + (targetX - prev) * 0.12;
         });
       }
     }
@@ -404,6 +440,11 @@ const MarbleRace = () => {
           <div className="ml-auto flex items-center gap-1.5 bg-neutral-100 px-3 py-1.5 rounded-full">
             <span className="text-xs text-neutral-400 font-medium">pot</span>
             <span className="text-sm font-semibold text-black">{pot} ETH</span>
+            {ethPriceUsd && (
+              <span className="text-xs text-neutral-500">
+                (${(parseFloat(pot) * ethPriceUsd).toFixed(2)})
+              </span>
+            )}
           </div>
         )}
       </header>
@@ -414,6 +455,11 @@ const MarbleRace = () => {
           <div className="bg-white rounded-2xl px-8 py-5 flex flex-col items-center shadow-sm mb-8 mt-4">
             <span className="text-xs text-neutral-400 font-medium uppercase tracking-wide">buy-in</span>
             <span className="text-3xl font-bold text-black tracking-tight">{buyIn} ETH</span>
+            {ethPriceUsd && (
+              <span className="text-sm text-neutral-500 font-medium mt-1">
+                ${(parseFloat(buyIn) * ethPriceUsd).toFixed(2)}
+              </span>
+            )}
           </div>
 
           {/* Vertical bullet-point style player list */}
@@ -528,14 +574,13 @@ const MarbleRace = () => {
               willChange: 'transform',
             }}
           >
-            {/* SVG Track with Curves and Twists - Full track rendered */}
+            {/* SVG Track - Snakes and Ladders style zigzag path */}
             <svg 
               className="absolute inset-0 w-full h-full"
-              viewBox="0 0 2000 800"
+              viewBox="0 0 4000 800"
               preserveAspectRatio="none"
-              style={{ minWidth: '2000px' }}
+              style={{ minWidth: '4000px' }}
             >
-              {/* Track Shadow/Glow */}
               <defs>
                 <filter id="trackGlow">
                   <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
@@ -544,93 +589,229 @@ const MarbleRace = () => {
                     <feMergeNode in="SourceGraphic"/>
                   </feMerge>
                 </filter>
-                <linearGradient id="trackGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#f8fafc" />
-                  <stop offset="25%" stopColor="#e2e8f0" />
-                  <stop offset="50%" stopColor="#f1f5f9" />
-                  <stop offset="75%" stopColor="#e2e8f0" />
-                  <stop offset="100%" stopColor="#f8fafc" />
-                </linearGradient>
-                <linearGradient id="trackBorderGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#cbd5e1" />
-                  <stop offset="50%" stopColor="#94a3b8" />
-                  <stop offset="100%" stopColor="#cbd5e1" />
-                </linearGradient>
               </defs>
               
-              {/* Track Outer Border with Shadow */}
-              <path
-                d="M 0 400 Q 200 200 400 300 T 800 250 T 1200 350 T 1600 200 T 2000 400"
-                fill="none"
-                stroke="url(#trackBorderGradient)"
-                strokeWidth="88"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                filter="url(#trackGlow)"
-                opacity="0.4"
-              />
-              
-              {/* Track Main Path - Beautiful gradient */}
+              {/* Snakes and Ladders style zigzag track path */}
+              {/* Goes: right, down, left, down, right, down, left, down, right, down, left, down, right */}
               <path
                 ref={trackPathRef}
-                d="M 0 400 Q 200 200 400 300 T 800 250 T 1200 350 T 1600 200 T 2000 400"
+                d="M 100 100 
+                   L 700 100 
+                   L 700 200 
+                   L 100 200 
+                   L 100 300 
+                   L 700 300 
+                   L 700 400 
+                   L 100 400 
+                   L 100 500 
+                   L 700 500 
+                   L 700 600 
+                   L 100 600 
+                   L 100 700
+                   L 700 700
+                   L 700 750
+                   L 3900 750"
                 fill="none"
-                stroke="url(#trackGradient)"
-                strokeWidth="80"
+                stroke="#374151"
+                strokeWidth="88"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 id="track-path"
               />
               
-              {/* Track Inner Highlight */}
+              {/* Track Base - Dark asphalt */}
               <path
-                d="M 0 400 Q 200 200 400 300 T 800 250 T 1200 350 T 1600 200 T 2000 400"
+                d="M 100 100 
+                   L 700 100 
+                   L 700 200 
+                   L 100 200 
+                   L 100 300 
+                   L 700 300 
+                   L 700 400 
+                   L 100 400 
+                   L 100 500 
+                   L 700 500 
+                   L 700 600 
+                   L 100 600 
+                   L 100 700
+                   L 700 700
+                   L 700 750
+                   L 3900 750"
                 fill="none"
-                stroke="rgba(255,255,255,0.6)"
-                strokeWidth="72"
+                stroke="#1f2937"
+                strokeWidth="100"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
               
-              {/* Lane Markers - Sleek dashed lines */}
+              {/* Track Outer Border - White lines */}
               <path
-                d="M 0 400 Q 200 200 400 300 T 800 250 T 1200 350 T 1600 200 T 2000 400"
+                d="M 100 100 
+                   L 700 100 
+                   L 700 200 
+                   L 100 200 
+                   L 100 300 
+                   L 700 300 
+                   L 700 400 
+                   L 100 400 
+                   L 100 500 
+                   L 700 500 
+                   L 700 600 
+                   L 100 600 
+                   L 100 700
+                   L 700 700
+                   L 700 750
+                   L 3900 750"
                 fill="none"
-                stroke="rgba(148, 163, 184, 0.4)"
-                strokeWidth="2"
-                strokeDasharray="8 12"
+                stroke="#ffffff"
+                strokeWidth="8"
                 strokeLinecap="round"
+                strokeLinejoin="round"
               />
               
-              {/* Track Surface Texture */}
+              {/* Track Inner Border - White lines */}
               <path
-                d="M 0 400 Q 200 200 400 300 T 800 250 T 1200 350 T 1600 200 T 2000 400"
+                d="M 100 100 
+                   L 700 100 
+                   L 700 200 
+                   L 100 200 
+                   L 100 300 
+                   L 700 300 
+                   L 700 400 
+                   L 100 400 
+                   L 100 500 
+                   L 700 500 
+                   L 700 600 
+                   L 100 600 
+                   L 100 700
+                   L 700 700
+                   L 700 750
+                   L 3900 750"
                 fill="none"
-                stroke="rgba(255,255,255,0.3)"
-                strokeWidth="76"
+                stroke="#ffffff"
+                strokeWidth="6"
                 strokeLinecap="round"
-                strokeDasharray="30 20"
-                opacity="0.6"
+                strokeLinejoin="round"
               />
               
-              {/* Obstacles along the track - Sleek design */}
+              {/* Center Line - Yellow dashed */}
+              <path
+                d="M 100 100 
+                   L 700 100 
+                   L 700 200 
+                   L 100 200 
+                   L 100 300 
+                   L 700 300 
+                   L 700 400 
+                   L 100 400 
+                   L 100 500 
+                   L 700 500 
+                   L 700 600 
+                   L 100 600 
+                   L 100 700
+                   L 700 700
+                   L 700 750
+                   L 3900 750"
+                fill="none"
+                stroke="#fbbf24"
+                strokeWidth="4"
+                strokeDasharray="25 20"
+                strokeLinecap="round"
+                opacity="0.95"
+              />
+              
+              {/* Grid squares like snakes and ladders board */}
+              {[...Array(12)].map((_, row) => {
+                const y = 100 + row * 100;
+                const isEvenRow = row % 2 === 0;
+                return (
+                  <g key={row}>
+                    {/* Horizontal grid lines */}
+                    <line
+                      x1="100"
+                      y1={y}
+                      x2="700"
+                      y2={y}
+                      stroke="rgba(255,255,255,0.1)"
+                      strokeWidth="1"
+                    />
+                    {/* Vertical grid lines every 100 units */}
+                    {[...Array(7)].map((_, col) => {
+                      const x = 100 + col * 100;
+                      return (
+                        <line
+                          key={col}
+                          x1={x}
+                          y1={y}
+                          x2={x}
+                          y2={y + 100}
+                          stroke="rgba(255,255,255,0.1)"
+                          strokeWidth="1"
+                        />
+                      );
+                    })}
+                  </g>
+                );
+              })}
+              
+              {/* Final straight section grid */}
+              <line
+                x1="700"
+                y1="700"
+                x2="3900"
+                y2="750"
+                stroke="rgba(255,255,255,0.1)"
+                strokeWidth="1"
+                strokeDasharray="50 50"
+              />
+              
+              {/* Track Texture - Subtle road markings */}
+              <path
+                d="M 100 100 
+                   L 700 100 
+                   L 700 200 
+                   L 100 200 
+                   L 100 300 
+                   L 700 300 
+                   L 700 400 
+                   L 100 400 
+                   L 100 500 
+                   L 700 500 
+                   L 700 600 
+                   L 100 600 
+                   L 100 700
+                   L 700 700
+                   L 700 750
+                   L 3900 750"
+                fill="none"
+                stroke="rgba(255,255,255,0.15)"
+                strokeWidth="84"
+                strokeLinecap="round"
+                strokeDasharray="60 120"
+                opacity="0.5"
+              />
+              
+              {/* Snakes and Ladders obstacles - positioned at corners */}
               {trackPathRef.current && pathLength > 0 && [...Array(6)].map((_, i) => {
-                const obstacleProgress = 0.15 + (i * 0.12);
+                const obstacleProgress = 0.1 + (i * 0.15);
                 if (obstacleProgress >= 1 || !trackPathRef.current) return null;
                 const distance = obstacleProgress * pathLength;
                 const point = trackPathRef.current.getPointAtLength(distance);
-                // Offset obstacle slightly to the side of track
-                const normalAngle = trackPathRef.current.getPointAtLength(distance + 1);
-                const angle = Math.atan2(normalAngle.y - point.y, normalAngle.x - point.x) + Math.PI / 2;
-                const offsetX = Math.cos(angle) * 50;
-                const offsetY = Math.sin(angle) * 50;
                 
                 return (
-                  <g key={i} transform={`translate(${point.x + offsetX}, ${point.y + offsetY})`}>
+                  <g key={i} transform={`translate(${point.x}, ${point.y})`}>
+                    {/* Obstacle shadow */}
+                    <circle
+                      r="20"
+                      fill="rgba(0,0,0,0.3)"
+                      opacity="0.5"
+                      cy="3"
+                    />
+                    {/* Obstacle */}
                     <circle
                       r="18"
                       fill="url(#obstacleGradient)"
-                      opacity="0.8"
+                      opacity="0.9"
                       filter="url(#obstacleGlow)"
                     />
                     <circle
@@ -649,32 +830,45 @@ const MarbleRace = () => {
                 );
               })}
               
-              {/* Finish Line - Beautiful checker pattern */}
+              {/* Finish Line - At the end of the zigzag track */}
               {trackPathRef.current && pathLength > 0 && (() => {
                 const finishPoint = trackPathRef.current.getPointAtLength(pathLength);
                 const prevPoint = trackPathRef.current.getPointAtLength(pathLength - 10);
-                const angle = Math.atan2(finishPoint.y - prevPoint.y, finishPoint.x - prevPoint.x) + Math.PI / 2;
+                const finishAngle = Math.atan2(finishPoint.y - prevPoint.y, finishPoint.x - prevPoint.x) * 180 / Math.PI;
+                const perpendicularAngle = finishAngle + 90;
                 return (
-                  <g transform={`translate(${finishPoint.x}, ${finishPoint.y}) rotate(${angle * 180 / Math.PI})`}>
-                    <rect x="-12" y="-250" width="24" height="500" fill="url(#checkerPattern)" opacity="0.95" />
-                    <rect x="-12" y="-250" width="24" height="500" fill="url(#finishGradient)" opacity="0.3" />
-                    <line x1="0" y1="-250" x2="0" y2="250" stroke="#000" strokeWidth="5" opacity="0.8" />
-                    <line x1="-2" y1="-250" x2="-2" y2="250" stroke="#fff" strokeWidth="2" opacity="0.6" />
-                    <line x1="2" y1="-250" x2="2" y2="250" stroke="#fff" strokeWidth="2" opacity="0.6" />
+                  <g transform={`translate(${finishPoint.x}, ${finishPoint.y}) rotate(${perpendicularAngle})`}>
+                    {/* Finish line base */}
+                    <rect x="-15" y="-300" width="30" height="600" fill="url(#checkerPattern)" opacity="1" />
+                    {/* Finish line glow */}
+                    <rect x="-15" y="-300" width="30" height="600" fill="url(#finishGradient)" opacity="0.4" />
+                    {/* Black border lines */}
+                    <line x1="0" y1="-300" x2="0" y2="300" stroke="#000" strokeWidth="6" opacity="1" />
+                    <line x1="-3" y1="-300" x2="-3" y2="300" stroke="#fff" strokeWidth="2" opacity="0.8" />
+                    <line x1="3" y1="-300" x2="3" y2="300" stroke="#fff" strokeWidth="2" opacity="0.8" />
+                    {/* Finish flag effect */}
+                    <rect x="5" y="-200" width="20" height="400" fill="url(#finishFlag)" opacity="0.8" />
                   </g>
                 );
               })()}
               
               {/* Enhanced Patterns and Gradients */}
               <defs>
-                <pattern id="checkerPattern" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
-                  <rect width="12" height="12" fill="#000" />
-                  <rect x="12" y="12" width="12" height="12" fill="#000" />
+                <pattern id="checkerPattern" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
+                  <rect width="15" height="15" fill="#000" />
+                  <rect x="15" y="15" width="15" height="15" fill="#000" />
+                  <rect width="15" height="15" fill="#fff" />
+                  <rect x="15" y="15" width="15" height="15" fill="#fff" />
                 </pattern>
                 <linearGradient id="finishGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.8" />
-                  <stop offset="50%" stopColor="#f59e0b" stopOpacity="0.6" />
-                  <stop offset="100%" stopColor="#d97706" stopOpacity="0.8" />
+                  <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.9" />
+                  <stop offset="50%" stopColor="#f59e0b" stopOpacity="0.7" />
+                  <stop offset="100%" stopColor="#d97706" stopOpacity="0.9" />
+                </linearGradient>
+                <linearGradient id="finishFlag" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#ef4444" />
+                  <stop offset="50%" stopColor="#dc2626" />
+                  <stop offset="100%" stopColor="#991b1b" />
                 </linearGradient>
                 <linearGradient id="obstacleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#dc2626" />
@@ -691,8 +885,8 @@ const MarbleRace = () => {
               </defs>
             </svg>
             
-            {/* Marbles on Track - Perfectly positioned using SVG path */}
-            <div className="absolute inset-0">
+            {/* Marbles on Track - Positioned using SVG coordinates */}
+            <div className="absolute inset-0" style={{ pointerEvents: 'none' }}>
               {players.map((player, i) => {
                 const position = marblePositions[i];
                 const progress = Math.min(position / TRACK_LENGTH, 1);
@@ -716,33 +910,40 @@ const MarbleRace = () => {
                   }
                 }
                 
+                // Convert SVG viewBox coordinates (0-4000, 0-800) to percentage
+                // The SVG has viewBox="0 0 4000 800" and preserveAspectRatio="none"
+                const xPercent = (x / 4000) * 100;
+                const yPercent = (y / 800) * 100;
+                
                 return (
                   <div
                     key={i}
                     className="absolute transition-all duration-75"
                     style={{
-                      left: `${x}px`,
-                      top: `${y}px`,
-                      transform: `translate(-50%, -50%) rotate(${angle}deg) scale(${isLeading ? 1.15 : 1})`,
+                      left: `${xPercent}%`,
+                      top: `${yPercent}%`,
+                      transform: `translate(-50%, -50%) rotate(${angle}deg) scale(${isLeading ? 1.1 : 1})`,
                       zIndex: isLeading ? 20 : 10,
                     }}
                   >
-                    {/* Marble - Perfectly sized for track */}
+                    {/* Marble - Small to fit track (8px = fits 88px track width) */}
                     <div
-                      className="w-14 h-14 rounded-full overflow-hidden relative transition-transform duration-75"
+                      className="w-8 h-8 rounded-full overflow-hidden relative transition-all duration-75"
                       style={{
                         backgroundColor: player.color,
                         backgroundImage: player.pfpUrl ? `url(${player.pfpUrl})` : undefined,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                         boxShadow: isLeading
-                          ? `0 10px 40px ${player.color}aa, 0 6px 20px rgba(0,0,0,0.5), inset 0 -5px 10px rgba(0,0,0,0.3), inset 0 5px 10px rgba(255,255,255,0.7)`
-                          : '0 6px 20px rgba(0,0,0,0.4), inset 0 -4px 8px rgba(0,0,0,0.25), inset 0 4px 8px rgba(255,255,255,0.6)',
-                        border: player.pfpUrl ? `3px solid ${player.color}` : 'none',
-                        filter: isLeading ? 'brightness(1.2) saturate(1.3) drop-shadow(0 0 8px rgba(255,215,0,0.6))' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                          ? `0 6px 24px ${player.color}dd, 0 3px 12px rgba(0,0,0,0.7), inset 0 -2px 4px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.9)`
+                          : '0 3px 12px rgba(0,0,0,0.6), inset 0 -1.5px 3px rgba(0,0,0,0.4), inset 0 1.5px 3px rgba(255,255,255,0.8)',
+                        border: player.pfpUrl ? `1.5px solid ${player.color}` : 'none',
+                        filter: isLeading 
+                          ? 'brightness(1.3) saturate(1.5) drop-shadow(0 0 10px rgba(255,215,0,0.9))' 
+                          : 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
                         transform: speedBursts[i] && (Date.now() - speedBursts[i]) < 500 
                           ? 'scale(1.2)' 
-                          : 'scale(1)',
+                          : isLeading ? 'scale(1.15)' : 'scale(1)',
                       }}
                     >
                       {/* Speed Burst Effect - Visual suspense */}
@@ -787,14 +988,14 @@ const MarbleRace = () => {
                       )}
                     </div>
                     
-                    {/* Player Name Label - Sleek design */}
+                    {/* Player Name Label - Compact design */}
                     <div
-                      className="absolute top-16 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none"
+                      className="absolute top-10 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none"
                       style={{
-                        textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                        textShadow: '0 1px 4px rgba(0,0,0,0.8)',
                       }}
                     >
-                      <span className={`text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-sm ${isLeading ? 'bg-yellow-400/95 text-black shadow-lg' : 'bg-black/80 text-white shadow-md'}`}>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm ${isLeading ? 'bg-yellow-400/95 text-black shadow-lg' : 'bg-black/85 text-white shadow-md'}`}>
                         {player.handle}
                       </span>
                     </div>
@@ -808,7 +1009,14 @@ const MarbleRace = () => {
           <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="bg-white/95 backdrop-blur-md rounded-xl px-4 py-2.5 shadow-xl border border-white/20">
-                <span className="text-sm font-semibold text-black">Pot: {pot} ETH</span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-black">Pot: {pot} ETH</span>
+                  {ethPriceUsd && (
+                    <span className="text-xs text-neutral-500">
+                      ${(parseFloat(pot) * ethPriceUsd).toFixed(2)}
+                    </span>
+                  )}
+                </div>
               </div>
               {/* Race Timer - Builds suspense */}
               <div className={`bg-gradient-to-r ${raceTime > 8 ? 'from-red-500/90 to-orange-500/90' : raceTime > 6 ? 'from-yellow-500/90 to-orange-500/90' : 'from-blue-500/90 to-indigo-500/90'} backdrop-blur-md rounded-xl px-4 py-2.5 shadow-xl border border-white/20`}>
@@ -1281,4 +1489,6 @@ const MarbleRace = () => {
 };
 
 export default MarbleRace;
+
+
 
