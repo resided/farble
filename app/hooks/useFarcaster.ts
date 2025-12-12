@@ -22,7 +22,7 @@ export function useFarcaster() {
         const context = await sdk.context;
         if (context?.user) {
           const userData = context.user;
-          // Get profile picture from various possible locations in Farcaster context
+          // Get profile picture from various possible locations in Farcaster contexts
           const pfpUrl = (userData as any).pfp?.url || 
                         (userData as any).pfp_url || 
                         (userData as any).profile_picture_url;
