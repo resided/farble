@@ -46,10 +46,16 @@ const MarbleRace = () => {
     { id: 5, name: 'ted', handle: '@ted', color: '#AF52DE', colorName: 'Grape', joined: true },
   ], [user]);
 
-  // Fetch profile pictures from Neynar
+  // Fetch profile pictures from Neynar for other players (not the current user)
   useEffect(() => {
     const loadProfiles = async () => {
-      const handles = basePlayers.map(p => p.handle);
+      // Only fetch profiles for other players, not the current user
+      // The current user's profile comes from Farcaster context
+      const otherPlayers = basePlayers.filter(p => !p.isYou && p.joined);
+      const handles = otherPlayers.map(p => p.handle);
+      
+      if (handles.length === 0) return;
+      
       const profiles = await fetchNeynarProfiles(handles);
       if (Object.keys(profiles).length > 0) {
         console.log('Setting player profile pictures:', profiles);
@@ -64,12 +70,23 @@ const MarbleRace = () => {
   }, [screen, basePlayers]);
 
   // Merge players with profile pictures
+  // Current user gets pfpUrl from Farcaster context, others from Neynar
   const players: Player[] = useMemo(() => {
-    return basePlayers.map(player => ({
-      ...player,
-      pfpUrl: player.pfpUrl || playerPfps[player.handle] || undefined,
-    }));
-  }, [basePlayers, playerPfps]);
+    return basePlayers.map(player => {
+      // Current user: use pfpUrl from Farcaster context
+      if (player.isYou) {
+        return {
+          ...player,
+          pfpUrl: user?.pfpUrl || player.pfpUrl,
+        };
+      }
+      // Other players: use pfpUrl from Neynar fetch
+      return {
+        ...player,
+        pfpUrl: playerPfps[player.handle] || undefined,
+      };
+    });
+  }, [basePlayers, playerPfps, user?.pfpUrl]);
 
   const buyIn = '0.001';
   const pot = (players.filter(p => p.joined).length * parseFloat(buyIn)).toFixed(3);

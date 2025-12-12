@@ -22,11 +22,22 @@ export function useFarcaster() {
         const context = await sdk.context;
         if (context?.user) {
           const userData = context.user;
+          // Get profile picture from various possible locations in Farcaster context
+          const pfpUrl = (userData as any).pfp?.url || 
+                        (userData as any).pfp_url || 
+                        (userData as any).profile_picture_url;
+          
+          console.log('Farcaster user data:', { 
+            username: userData.username, 
+            fid: userData.fid,
+            pfpUrl 
+          });
+          
           setUser({
             fid: userData.fid,
             username: userData.username || userData.displayName?.toLowerCase() || 'user',
             displayName: userData.displayName || userData.username || 'User',
-            pfpUrl: (userData as any).pfp?.url,
+            pfpUrl: pfpUrl,
           });
         } else {
           // Fallback for development/testing or when not in Farcaster client
