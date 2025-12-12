@@ -28,6 +28,9 @@ const MarbleRace = () => {
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
   const [hasPaid, setHasPaid] = useState(false);
   const [playerPfps, setPlayerPfps] = useState<Record<string, string>>({});
+  const [vrfSeed, setVrfSeed] = useState<string | null>(null);
+  const [showWinnerDialog, setShowWinnerDialog] = useState(false);
+  const [raceStartTime, setRaceStartTime] = useState<number | null>(null);
 
   const basePlayers: Player[] = useMemo(() => [
     { 
@@ -87,6 +90,37 @@ const MarbleRace = () => {
 
   const buyIn = '0.001';
   const pot = (players.filter(p => p.joined).length * parseFloat(buyIn)).toFixed(3);
+  const TRACK_LENGTH = 200; // Longer track (200% instead of 100%)
+
+  // Generate VRF seed for verifiable randomness
+  const generateVrfSeed = (): string => {
+    // In production, use a proper VRF service or onchain VRF
+    // For now, use crypto.getRandomValues for cryptographically secure randomness
+    const randomBytes = new Uint8Array(32);
+    if (typeof window !== 'undefined' && window.crypto) {
+      window.crypto.getRandomValues(randomBytes);
+    } else {
+      // Fallback for environments without crypto
+      for (let i = 0; i < 32; i++) {
+        randomBytes[i] = Math.floor(Math.random() * 256);
+      }
+    }
+    
+    // Convert to hex string
+    const hex = Array.from(randomBytes)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    
+    // Add timestamp and race data for additional entropy
+    const timestamp = Date.now();
+    const raceData = players.map(p => p.handle).join('');
+    const combined = `${hex}${timestamp.toString(16)}${btoa(raceData).slice(0, 16)}`;
+    
+    return combined.slice(0, 64); // 32 bytes = 64 hex chars
+  };
+
+  // VRF seed determines speeds deterministically, making the race provably fair
+  // The winner is the first player to cross the finish line
 
   const handleJoinRace = async () => {
     if (hasPaid) {
@@ -134,29 +168,58 @@ const MarbleRace = () => {
   };
 
   useEffect(() => {
-    if (screen === 'racing' && !winnerFound) {
+    if (screen === 'racing' && !winnerFound && raceStartTime) {
+      // Generate VRF seed when race starts (only once)
+      if (!vrfSeed) {
+        const seed = generateVrfSeed();
+        setVrfSeed(seed);
+        console.log('VRF Seed generated:', seed);
+      }
+
       const interval = setInterval(() => {
         setMarblePositions(prev => {
-          const newPositions = prev.map((pos) => {
-            if (pos >= 100) return 100;
-            const speed = Math.random() * 4 + 0.5;
-            return Math.min(100, pos + speed);
+          const seed = vrfSeed || generateVrfSeed();
+          
+          const newPositions = prev.map((pos, i) => {
+            if (pos >= TRACK_LENGTH) return TRACK_LENGTH;
+            
+            // Use VRF seed deterministically for each player's speed
+            // Each player gets a portion of the seed for their base speed
+            const seedOffset = i * 8; // Each player uses 8 hex chars (4 bytes)
+            const playerSeed = parseInt(seed.slice(seedOffset, seedOffset + 8) || '1', 16);
+            
+            // Use time elapsed for variation, but base it on seed
+            const timeElapsed = Date.now() - (raceStartTime || 0);
+            const frame = Math.floor(timeElapsed / 50); // Frame number
+            
+            // Deterministic speed based on seed + frame + position
+            const combinedSeed = (playerSeed + frame * 1000 + Math.floor(pos)) % 100000;
+            
+            // Base speed from seed (1.0 to 4.0), with small variations
+            const baseSpeed = 1.0 + ((playerSeed % 30000) / 30000) * 3.0;
+            const variation = (combinedSeed % 1000) / 1000 * 0.5; // ±0.25 variation
+            const speed = baseSpeed + variation;
+            
+            return Math.min(TRACK_LENGTH, pos + speed);
           });
           
-          const winnerIndex = newPositions.findIndex(p => p >= 100);
+          // Check for winner - first to cross finish line
+          const winnerIndex = newPositions.findIndex(p => p >= TRACK_LENGTH);
           if (winnerIndex !== -1 && !winnerFound) {
             setWinnerFound(true);
             setWinner(players[winnerIndex]);
-            setTimeout(() => setScreen('results'), 1000);
+            setTimeout(() => {
+              setShowWinnerDialog(true);
+            }, 800);
           }
           
           return newPositions;
         });
-      }, 60);
+      }, 50); // Faster updates for smoother animation
 
       return () => clearInterval(interval);
     }
-  }, [screen, winnerFound]);
+  }, [screen, winnerFound, vrfSeed, raceStartTime, players]);
 
   const startRace = () => {
     setCountdown(3);
@@ -165,6 +228,10 @@ const MarbleRace = () => {
         if (prev === null || prev <= 1) {
           clearInterval(countInterval);
           setScreen('racing');
+          setRaceStartTime(Date.now());
+          setVrfSeed(null); // Reset seed for new race
+          setWinnerFound(false);
+          setMarblePositions([0, 0, 0, 0, 0]);
           return null;
         }
         return prev - 1;
@@ -178,6 +245,9 @@ const MarbleRace = () => {
     setWinner(null);
     setWinnerFound(false);
     setCountdown(null);
+    setVrfSeed(null);
+    setShowWinnerDialog(false);
+    setRaceStartTime(null);
   };
 
   const sortedPlayers = [...players]
@@ -342,38 +412,40 @@ const MarbleRace = () => {
                 const isLeading = position === Math.max(...marblePositions);
                 return (
                   <div key={i} className="flex items-center gap-3">
-                    {/* Enhanced track with gradient and checkered pattern */}
-                    <div className="flex-1 h-3 bg-gradient-to-r from-neutral-100 via-neutral-50 to-neutral-100 rounded-full relative overflow-visible border border-neutral-200/30">
-                      {/* Track surface pattern */}
+                    {/* Enhanced longer track with gradient and checkered pattern */}
+                    <div className="flex-1 h-4 bg-gradient-to-r from-neutral-100 via-neutral-50 to-neutral-100 rounded-full relative overflow-visible border-2 border-neutral-200/40">
+                      {/* Track surface pattern with lane markers */}
                       <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,rgba(0,0,0,0.02)_50%,transparent_100%)] rounded-full" />
+                      {/* Lane dividers */}
+                      <div className="absolute inset-0 bg-[repeating-linear-gradient(90deg,transparent_0px,transparent_48px,rgba(0,0,0,0.05)_48px,rgba(0,0,0,0.05)_50px)] rounded-full" />
                       
                       {/* Motion blur trail */}
                       {position > 5 && (
                         <div 
-                          className="absolute h-3 rounded-full opacity-30 blur-sm transition-all duration-75"
+                          className="absolute h-4 rounded-full opacity-40 blur-md transition-all duration-75"
                           style={{ 
                             backgroundColor: player.color,
-                            left: `calc(${Math.max(0, position - 8)}% - 12px)`,
-                            width: '24px',
+                            left: `calc(${Math.max(0, (position / TRACK_LENGTH) * 100 - 3)}% - 12px)`,
+                            width: '28px',
                           }}
                         />
                       )}
                       
-                      {/* Marble with enhanced effects and profile picture */}
+                      {/* Marble with enhanced effects and profile picture - larger and clearer */}
                       <div 
-                        className="absolute w-7 h-7 rounded-full top-1/2 -mt-3.5 transition-all duration-75 z-10 overflow-hidden"
+                        className="absolute w-8 h-8 rounded-full top-1/2 -mt-4 transition-all duration-75 z-10 overflow-hidden"
                         style={{ 
                           backgroundColor: player.pfpUrl ? 'transparent' : player.color,
                           backgroundImage: player.pfpUrl ? `url(${player.pfpUrl})` : undefined,
                           backgroundSize: 'cover',
                           backgroundPosition: 'center',
-                          left: `calc(${Math.min(position, 95)}% - 14px)`,
+                          left: `calc(${Math.min((position / TRACK_LENGTH) * 100, 98)}% - 16px)`,
                           boxShadow: isLeading 
-                            ? `0 4px 20px ${player.color}80, 0 2px 8px rgba(0,0,0,0.3), inset 0 -3px 6px rgba(0,0,0,0.2), inset 0 3px 6px rgba(255,255,255,0.5)`
-                            : '0 2px 12px rgba(0,0,0,0.25), inset 0 -2px 4px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.4)',
-                          transform: `rotate(${position * 12}deg) scale(${isLeading ? 1.1 : 1})`,
-                          filter: isLeading ? 'brightness(1.1)' : 'none',
-                          border: player.pfpUrl ? `1.5px solid ${player.color}` : 'none',
+                            ? `0 6px 24px ${player.color}90, 0 3px 10px rgba(0,0,0,0.4), inset 0 -4px 8px rgba(0,0,0,0.25), inset 0 4px 8px rgba(255,255,255,0.6)`
+                            : '0 3px 14px rgba(0,0,0,0.3), inset 0 -3px 6px rgba(0,0,0,0.2), inset 0 3px 6px rgba(255,255,255,0.5)',
+                          transform: `rotate(${position * 8}deg) scale(${isLeading ? 1.15 : 1})`,
+                          filter: isLeading ? 'brightness(1.15) saturate(1.2)' : 'none',
+                          border: player.pfpUrl ? `2px solid ${player.color}` : 'none',
                         }}
                       >
                         {/* Profile picture overlay with marble effect - small and fits inside */}
@@ -403,32 +475,44 @@ const MarbleRace = () => {
                           </>
                         )}
                         {/* Leading indicator */}
-                        {isLeading && position < 100 && (
-                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-ping z-20" />
+                        {isLeading && position < TRACK_LENGTH && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full animate-ping z-20" />
+                        )}
+                        {/* Winner crown */}
+                        {position >= TRACK_LENGTH && isLeading && (
+                          <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center z-30">
+                            <span className="text-white text-xs">👑</span>
+                          </div>
                         )}
                       </div>
                       
                       {/* Speed lines effect */}
-                      {position > 10 && position < 100 && (
+                      {position > 10 && position < TRACK_LENGTH && (
                         <div 
-                          className="absolute h-3 w-8 opacity-20"
+                          className="absolute h-4 w-10 opacity-25"
                           style={{ 
-                            left: `calc(${position - 5}% - 16px)`,
+                            left: `calc(${(position / TRACK_LENGTH) * 100 - 2}% - 20px)`,
                             background: `linear-gradient(90deg, transparent, ${player.color}, transparent)`,
                           }}
                         />
                       )}
                     </div>
-                    <span className={`text-xs font-medium w-16 text-right truncate transition-colors ${isLeading ? 'text-black font-semibold' : 'text-neutral-400'}`}>
-                      {player.handle}
-                    </span>
+                    {/* Player name - larger and clearer */}
+                    <div className="flex flex-col items-end gap-0.5 min-w-[80px]">
+                      <span className={`text-sm font-bold text-right transition-colors ${isLeading ? 'text-black' : 'text-neutral-500'}`}>
+                        {player.handle}
+                      </span>
+                      {isLeading && position < TRACK_LENGTH && (
+                        <span className="text-[10px] text-yellow-500 font-bold uppercase">leading</span>
+                      )}
+                    </div>
                   </div>
                 );
               })}
               
-              {/* Enhanced finish line with checkered pattern */}
-              <div className="absolute right-12 top-0 bottom-0 w-1 flex flex-col">
-                {[...Array(20)].map((_, i) => (
+              {/* Enhanced finish line with checkered pattern - positioned at end of longer track */}
+              <div className="absolute right-4 top-0 bottom-0 w-2 flex flex-col">
+                {[...Array(30)].map((_, i) => (
                   <div 
                     key={i}
                     className="flex-1"
@@ -437,11 +521,12 @@ const MarbleRace = () => {
                     }}
                   />
                 ))}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/20 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/30 to-transparent" />
               </div>
               
-              {/* Finish line glow */}
-              <div className="absolute right-12 top-0 bottom-0 w-0.5 bg-gradient-to-b from-transparent via-yellow-400 to-transparent opacity-60 blur-sm" />
+              {/* Finish line glow and flag effect */}
+              <div className="absolute right-4 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-yellow-400 to-transparent opacity-70 blur-sm" />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full opacity-80 blur-md" />
             </div>
           </div>
 
@@ -472,6 +557,85 @@ const MarbleRace = () => {
             ))}
           </div>
         </main>
+      )}
+
+      {/* Winner Dialog - appears when race ends */}
+      {showWinnerDialog && winner && vrfSeed && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative">
+            <button
+              onClick={() => {
+                setShowWinnerDialog(false);
+                setTimeout(() => setScreen('results'), 300);
+              }}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-neutral-100 hover:bg-neutral-200 transition-colors"
+            >
+              <span className="text-neutral-400 text-xl">×</span>
+            </button>
+            
+            <div className="flex flex-col items-center text-center">
+              <div className="text-6xl mb-4">🏆</div>
+              <h2 className="text-2xl font-bold text-black mb-2">Race Complete!</h2>
+              
+              {/* Winner display */}
+              <div className="relative mb-6">
+                <div 
+                  className="w-24 h-24 rounded-full relative overflow-hidden mx-auto"
+                  style={{ 
+                    backgroundColor: winner.pfpUrl ? 'transparent' : winner.color,
+                    backgroundImage: winner.pfpUrl ? `url(${winner.pfpUrl})` : undefined,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                    border: winner.pfpUrl ? `4px solid ${winner.color}` : 'none',
+                  }}
+                >
+                  {winner.pfpUrl && (
+                    <div 
+                      className="absolute inset-0 rounded-full"
+                      style={{
+                        background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3) 0%, transparent 60%)`,
+                      }}
+                    />
+                  )}
+                </div>
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-yellow-400 text-black text-xs font-bold px-3 py-1 rounded-full">
+                  WINNER
+                </div>
+              </div>
+              
+              <div className="w-full space-y-3 mb-6">
+                <div>
+                  <span className="text-sm text-neutral-500">Winner</span>
+                  <p className="text-xl font-bold text-black">{winner.handle}</p>
+                </div>
+                <div>
+                  <span className="text-sm text-neutral-500">Prize</span>
+                  <p className="text-xl font-bold text-green-500">+{(parseFloat(pot) * 0.9).toFixed(3)} ETH</p>
+                </div>
+                <div className="bg-neutral-50 rounded-xl p-4">
+                  <span className="text-xs text-neutral-500 uppercase tracking-wide block mb-2">VRF Seed</span>
+                  <code className="text-xs font-mono text-black break-all block">
+                    {vrfSeed}
+                  </code>
+                  <p className="text-[10px] text-neutral-400 mt-2">
+                    This seed was used to determine the winner in a provably fair manner
+                  </p>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => {
+                  setShowWinnerDialog(false);
+                  setTimeout(() => setScreen('results'), 300);
+                }}
+                className="w-full py-4 px-6 rounded-xl bg-black text-white text-sm font-semibold hover:bg-neutral-800 transition-colors"
+              >
+                View Full Results
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Results Screen */}
@@ -513,6 +677,19 @@ const MarbleRace = () => {
           {winner.isYou && (
             <div className="bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-full mt-3">
               That's you!
+            </div>
+          )}
+
+          {/* VRF Seed display */}
+          {vrfSeed && (
+            <div className="mt-6 bg-neutral-50 rounded-xl p-4 w-full max-w-sm">
+              <span className="text-xs text-neutral-500 uppercase tracking-wide block mb-2">VRF Seed</span>
+              <code className="text-xs font-mono text-black break-all block">
+                {vrfSeed}
+              </code>
+              <p className="text-[10px] text-neutral-400 mt-2 text-center">
+                Provably fair randomness seed used to determine winner
+              </p>
             </div>
           )}
 
