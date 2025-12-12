@@ -45,16 +45,16 @@ const MarbleRace = () => {
       id: 1, 
       name: user?.username || 'you', 
       handle: `@${user?.username || 'you'}`, 
-      color: '#FF3B30', 
-      colorName: 'Red', 
+      color: '#FF006E', 
+      colorName: 'Pink', 
       joined: true, 
       isYou: true,
       pfpUrl: user?.pfpUrl,
     },
-    { id: 2, name: 'dwr', handle: '@dwr', color: '#007AFF', colorName: 'Blue', joined: true },
-    { id: 3, name: 'vitalik', handle: '@vitalik', color: '#34C759', colorName: 'Mint', joined: true },
-    { id: 4, name: 'jessepollak', handle: '@jessepollak', color: '#FF9500', colorName: 'Gold', joined: true },
-    { id: 5, name: 'ted', handle: '@ted', color: '#AF52DE', colorName: 'Grape', joined: true },
+    { id: 2, name: 'dwr', handle: '@dwr', color: '#8338EC', colorName: 'Purple', joined: true },
+    { id: 3, name: 'vitalik', handle: '@vitalik', color: '#3A86FF', colorName: 'Blue', joined: true },
+    { id: 4, name: 'jessepollak', handle: '@jessepollak', color: '#06FFA5', colorName: 'Mint', joined: true },
+    { id: 5, name: 'ted', handle: '@ted', color: '#FFBE0B', colorName: 'Yellow', joined: true },
   ], [user]);
 
   // Fetch ETH price in USD - Live updates
@@ -547,46 +547,72 @@ const MarbleRace = () => {
                   key={i} 
                   className={`flex items-center gap-3 p-3 rounded-xl transition-all ${player.isYou ? 'bg-blue-50 ring-2 ring-blue-500' : 'bg-neutral-50'} ${player.joined ? '' : 'opacity-40'}`}
                 >
-                  {/* Bullet point - marble */}
+                  {/* Bullet point - marble - Clickable profile */}
                   <div className="relative flex-shrink-0">
-                    <div 
-                      className="w-12 h-12 rounded-full overflow-hidden relative"
-                      style={{ 
-                        backgroundColor: player.color,
-                        boxShadow: player.joined 
-                          ? '0 4px 16px rgba(0,0,0,0.2), inset 0 -4px 8px rgba(0,0,0,0.15), inset 0 4px 8px rgba(255,255,255,0.5)' 
-                          : 'none',
-                        border: player.pfpUrl ? `3px solid ${player.color}` : 'none',
-                      }}
-                    >
-                      {/* Profile picture or color fallback */}
-                      {player.pfpUrl ? (
-                        <img
-                          src={player.pfpUrl}
-                          alt={player.handle}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            // Hide the image if it fails to load, showing the color background instead
-                            e.currentTarget.style.display = 'none';
+                    {player.joined ? (
+                      <a
+                        href={`https://warpcast.com/${player.name}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block cursor-pointer hover:scale-110 transition-transform duration-200"
+                      >
+                        <div 
+                          className="w-12 h-12 rounded-full overflow-hidden relative"
+                          style={{ 
+                            backgroundColor: player.color,
+                            boxShadow: player.joined 
+                              ? '0 4px 16px rgba(0,0,0,0.2), inset 0 -4px 8px rgba(0,0,0,0.15), inset 0 4px 8px rgba(255,255,255,0.5)' 
+                              : 'none',
+                            border: player.pfpUrl ? `3px solid ${player.color}` : 'none',
+                          }}
+                        >
+                          {/* Profile picture or color fallback */}
+                          {player.pfpUrl ? (
+                            <img
+                              src={player.pfpUrl}
+                              alt={player.handle}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Hide the image if it fails to load, showing the color background instead
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : null}
+                          
+                          {/* Marble shine effect */}
+                          <div 
+                            className="absolute inset-0 rounded-full pointer-events-none"
+                            style={{
+                              background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 60%)`,
+                            }}
+                          />
+                          {/* Marble shadow effect */}
+                          <div 
+                            className="absolute inset-0 rounded-full pointer-events-none"
+                            style={{
+                              background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.2) 0%, transparent 60%)`,
+                            }}
+                          />
+                        </div>
+                      </a>
+                    ) : (
+                      <div 
+                        className="w-12 h-12 rounded-full overflow-hidden relative"
+                        style={{ 
+                          backgroundColor: player.color,
+                          boxShadow: 'none',
+                          border: player.pfpUrl ? `3px solid ${player.color}` : 'none',
+                        }}
+                      >
+                        {/* Marble shine effect */}
+                        <div 
+                          className="absolute inset-0 rounded-full pointer-events-none"
+                          style={{
+                            background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 60%)`,
                           }}
                         />
-                      ) : null}
-                      
-                      {/* Marble shine effect */}
-                      <div 
-                        className="absolute inset-0 rounded-full pointer-events-none"
-                        style={{
-                          background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 60%)`,
-                        }}
-                      />
-                      {/* Marble shadow effect */}
-                      <div 
-                        className="absolute inset-0 rounded-full pointer-events-none"
-                        style={{
-                          background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.2) 0%, transparent 60%)`,
-                        }}
-                      />
-                    </div>
+                      </div>
+                    )}
                     {/* You indicator - positioned outside the circle to avoid clipping */}
                     {player.isYou && (
                       <div className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow-md border-2 border-white z-10">
@@ -623,7 +649,22 @@ const MarbleRace = () => {
             </div>
           )}
 
-          <p className="text-xs text-neutral-300">Race starts when lobby is full</p>
+          <p className="text-xs text-neutral-300 mb-4">Race starts when lobby is full</p>
+          
+          {/* Footnote */}
+          <div className="mt-auto pb-6 text-center">
+            <p className="text-xs text-neutral-400">
+              a masterpiece in miniapp engineering by{' '}
+              <a 
+                href="https://farcaster.xyz/ireside.eth" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-neutral-600 hover:text-neutral-800 underline transition-colors"
+              >
+                @ireside.eth
+              </a>
+            </p>
+          </div>
         </main>
       )}
 
@@ -653,10 +694,10 @@ const MarbleRace = () => {
           >
             {/* SVG Track - Snakes and Ladders style zigzag path */}
             <svg 
-              className="absolute inset-0 w-full h-full"
+              className="absolute top-0 left-0"
               viewBox="0 0 4000 800"
               preserveAspectRatio="none"
-              style={{ minWidth: '4000px' }}
+              style={{ width: '4000px', height: '800px' }}
             >
               <defs>
                 <filter id="trackGlow">
@@ -670,24 +711,25 @@ const MarbleRace = () => {
               
               {/* Snakes and Ladders style zigzag track path */}
               {/* Goes: right, down, left, down, right, down, left, down, right, down, left, down, right */}
+              {/* Simplified path that's easier to follow */}
               <path
                 ref={trackPathRef}
-                d="M 100 100 
-                   L 700 100 
-                   L 700 200 
-                   L 100 200 
-                   L 100 300 
-                   L 700 300 
-                   L 700 400 
-                   L 100 400 
-                   L 100 500 
-                   L 700 500 
-                   L 700 600 
-                   L 100 600 
-                   L 100 700
-                   L 700 700
-                   L 700 750
-                   L 3900 750"
+                d="M 200 150 
+                   L 1800 150 
+                   L 1800 250 
+                   L 200 250 
+                   L 200 350 
+                   L 1800 350 
+                   L 1800 450 
+                   L 200 450 
+                   L 200 550 
+                   L 1800 550 
+                   L 1800 650 
+                   L 200 650 
+                   L 200 700
+                   L 1800 700
+                   L 1800 750
+                   L 3800 750"
                 fill="none"
                 stroke="#374151"
                 strokeWidth="88"
@@ -698,22 +740,22 @@ const MarbleRace = () => {
               
               {/* Track Base - Dark asphalt */}
               <path
-                d="M 100 100 
-                   L 700 100 
-                   L 700 200 
-                   L 100 200 
-                   L 100 300 
-                   L 700 300 
-                   L 700 400 
-                   L 100 400 
-                   L 100 500 
-                   L 700 500 
-                   L 700 600 
-                   L 100 600 
-                   L 100 700
-                   L 700 700
-                   L 700 750
-                   L 3900 750"
+                d="M 200 150 
+                   L 1800 150 
+                   L 1800 250 
+                   L 200 250 
+                   L 200 350 
+                   L 1800 350 
+                   L 1800 450 
+                   L 200 450 
+                   L 200 550 
+                   L 1800 550 
+                   L 1800 650 
+                   L 200 650 
+                   L 200 700
+                   L 1800 700
+                   L 1800 750
+                   L 3800 750"
                 fill="none"
                 stroke="#1f2937"
                 strokeWidth="100"
@@ -723,22 +765,22 @@ const MarbleRace = () => {
               
               {/* Track Outer Border - White lines */}
               <path
-                d="M 100 100 
-                   L 700 100 
-                   L 700 200 
-                   L 100 200 
-                   L 100 300 
-                   L 700 300 
-                   L 700 400 
-                   L 100 400 
-                   L 100 500 
-                   L 700 500 
-                   L 700 600 
-                   L 100 600 
-                   L 100 700
-                   L 700 700
-                   L 700 750
-                   L 3900 750"
+                d="M 200 150 
+                   L 1800 150 
+                   L 1800 250 
+                   L 200 250 
+                   L 200 350 
+                   L 1800 350 
+                   L 1800 450 
+                   L 200 450 
+                   L 200 550 
+                   L 1800 550 
+                   L 1800 650 
+                   L 200 650 
+                   L 200 700
+                   L 1800 700
+                   L 1800 750
+                   L 3800 750"
                 fill="none"
                 stroke="#ffffff"
                 strokeWidth="8"
@@ -748,22 +790,22 @@ const MarbleRace = () => {
               
               {/* Track Inner Border - White lines */}
               <path
-                d="M 100 100 
-                   L 700 100 
-                   L 700 200 
-                   L 100 200 
-                   L 100 300 
-                   L 700 300 
-                   L 700 400 
-                   L 100 400 
-                   L 100 500 
-                   L 700 500 
-                   L 700 600 
-                   L 100 600 
-                   L 100 700
-                   L 700 700
-                   L 700 750
-                   L 3900 750"
+                d="M 200 150 
+                   L 1800 150 
+                   L 1800 250 
+                   L 200 250 
+                   L 200 350 
+                   L 1800 350 
+                   L 1800 450 
+                   L 200 450 
+                   L 200 550 
+                   L 1800 550 
+                   L 1800 650 
+                   L 200 650 
+                   L 200 700
+                   L 1800 700
+                   L 1800 750
+                   L 3800 750"
                 fill="none"
                 stroke="#ffffff"
                 strokeWidth="6"
@@ -773,22 +815,22 @@ const MarbleRace = () => {
               
               {/* Center Line - Yellow dashed */}
               <path
-                d="M 100 100 
-                   L 700 100 
-                   L 700 200 
-                   L 100 200 
-                   L 100 300 
-                   L 700 300 
-                   L 700 400 
-                   L 100 400 
-                   L 100 500 
-                   L 700 500 
-                   L 700 600 
-                   L 100 600 
-                   L 100 700
-                   L 700 700
-                   L 700 750
-                   L 3900 750"
+                d="M 200 150 
+                   L 1800 150 
+                   L 1800 250 
+                   L 200 250 
+                   L 200 350 
+                   L 1800 350 
+                   L 1800 450 
+                   L 200 450 
+                   L 200 550 
+                   L 1800 550 
+                   L 1800 650 
+                   L 200 650 
+                   L 200 700
+                   L 1800 700
+                   L 1800 750
+                   L 3800 750"
                 fill="none"
                 stroke="#fbbf24"
                 strokeWidth="4"
@@ -798,23 +840,22 @@ const MarbleRace = () => {
               />
               
               {/* Grid squares like snakes and ladders board */}
-              {[...Array(12)].map((_, row) => {
-                const y = 100 + row * 100;
-                const isEvenRow = row % 2 === 0;
+              {[...Array(7)].map((_, row) => {
+                const y = 150 + row * 100;
                 return (
                   <g key={row}>
                     {/* Horizontal grid lines */}
                     <line
-                      x1="100"
+                      x1="200"
                       y1={y}
-                      x2="700"
+                      x2="1800"
                       y2={y}
                       stroke="rgba(255,255,255,0.1)"
                       strokeWidth="1"
                     />
-                    {/* Vertical grid lines every 100 units */}
-                    {[...Array(7)].map((_, col) => {
-                      const x = 100 + col * 100;
+                    {/* Vertical grid lines */}
+                    {[...Array(17)].map((_, col) => {
+                      const x = 200 + col * 100;
                       return (
                         <line
                           key={col}
@@ -833,9 +874,9 @@ const MarbleRace = () => {
               
               {/* Final straight section grid */}
               <line
-                x1="700"
+                x1="1800"
                 y1="700"
-                x2="3900"
+                x2="3800"
                 y2="750"
                 stroke="rgba(255,255,255,0.1)"
                 strokeWidth="1"
@@ -844,22 +885,22 @@ const MarbleRace = () => {
               
               {/* Track Texture - Subtle road markings */}
               <path
-                d="M 100 100 
-                   L 700 100 
-                   L 700 200 
-                   L 100 200 
-                   L 100 300 
-                   L 700 300 
-                   L 700 400 
-                   L 100 400 
-                   L 100 500 
-                   L 700 500 
-                   L 700 600 
-                   L 100 600 
-                   L 100 700
-                   L 700 700
-                   L 700 750
-                   L 3900 750"
+                d="M 200 150 
+                   L 1800 150 
+                   L 1800 250 
+                   L 200 250 
+                   L 200 350 
+                   L 1800 350 
+                   L 1800 450 
+                   L 200 450 
+                   L 200 550 
+                   L 1800 550 
+                   L 1800 650 
+                   L 200 650 
+                   L 200 700
+                   L 1800 700
+                   L 1800 750
+                   L 3800 750"
                 fill="none"
                 stroke="rgba(255,255,255,0.15)"
                 strokeWidth="84"
@@ -963,15 +1004,15 @@ const MarbleRace = () => {
             </svg>
             
             {/* Marbles on Track - Positioned using SVG coordinates */}
-            <div className="absolute inset-0" style={{ pointerEvents: 'none' }}>
+            <div className="absolute top-0 left-0" style={{ width: '4000px', height: '800px', pointerEvents: 'none' }}>
               {players.map((player, i) => {
                 const position = marblePositions[i];
                 const progress = Math.min(position / TRACK_LENGTH, 1);
                 const isLeading = position === Math.max(...marblePositions);
                 
                 // Get exact position on SVG path using getPointAtLength
-                let x = 0;
-                let y = 400;
+                let x = 200;
+                let y = 150;
                 let angle = 0;
                 
                 if (trackPathRef.current && pathLength > 0) {
@@ -987,51 +1028,73 @@ const MarbleRace = () => {
                   }
                 }
                 
-                // Convert SVG viewBox coordinates (0-4000, 0-800) to percentage
-                // The SVG has viewBox="0 0 4000 800" and preserveAspectRatio="none"
-                const xPercent = (x / 4000) * 100;
-                const yPercent = (y / 800) * 100;
-                
                 return (
                   <div
                     key={i}
                     className="absolute transition-all duration-75"
                     style={{
-                      left: `${xPercent}%`,
-                      top: `${yPercent}%`,
+                      left: `${x}px`,
+                      top: `${y}px`,
                       transform: `translate(-50%, -50%) rotate(${angle}deg) scale(${isLeading ? 1.1 : 1})`,
                       zIndex: isLeading ? 20 : 10,
                     }}
                   >
-                    {/* Marble - Small to fit track (8px = fits 88px track width) */}
+                    {/* Marble - Funky new design with sleek colors */}
                     <div
-                      className="w-8 h-8 rounded-full overflow-hidden relative transition-all duration-75"
+                      className="w-10 h-10 rounded-full overflow-hidden relative transition-all duration-75"
                       style={{
-                        backgroundColor: player.color,
-                        backgroundImage: player.pfpUrl ? `url(${player.pfpUrl})` : undefined,
-                        backgroundSize: 'cover',
+                        background: player.pfpUrl 
+                          ? `url(${player.pfpUrl})`
+                          : `linear-gradient(135deg, ${player.color} 0%, ${player.color}dd 50%, ${player.color}aa 100%)`,
+                        backgroundSize: player.pfpUrl ? 'cover' : 'auto',
                         backgroundPosition: 'center',
                         boxShadow: isLeading
-                          ? `0 6px 24px ${player.color}dd, 0 3px 12px rgba(0,0,0,0.7), inset 0 -2px 4px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.9)`
-                          : '0 3px 12px rgba(0,0,0,0.6), inset 0 -1.5px 3px rgba(0,0,0,0.4), inset 0 1.5px 3px rgba(255,255,255,0.8)',
-                        border: player.pfpUrl ? `1.5px solid ${player.color}` : 'none',
+                          ? `0 8px 32px ${player.color}ff, 0 4px 16px rgba(0,0,0,0.8), inset 0 -3px 6px rgba(0,0,0,0.6), inset 0 3px 6px rgba(255,255,255,1)`
+                          : `0 4px 16px ${player.color}88, 0 2px 8px rgba(0,0,0,0.7), inset 0 -2px 4px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.9)`,
+                        border: `2px solid ${player.color}`,
                         filter: marbleEvents[i]?.type === 'fall'
                           ? 'brightness(0.5) saturate(0.5) drop-shadow(0 0 8px rgba(255,0,0,0.8))'
                           : marbleEvents[i]?.type === 'crash'
                           ? 'brightness(0.6) drop-shadow(0 0 6px rgba(255,100,0,0.6))'
                           : isLeading 
-                          ? 'brightness(1.3) saturate(1.5) drop-shadow(0 0 10px rgba(255,215,0,0.9))' 
-                          : 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
+                          ? 'brightness(1.4) saturate(1.6) drop-shadow(0 0 12px rgba(255,215,0,1))' 
+                          : 'drop-shadow(0 3px 6px rgba(0,0,0,0.6))',
                         transform: speedBursts[i] && (Date.now() - speedBursts[i]) < 500 
-                          ? 'scale(1.2)' 
+                          ? 'scale(1.25)' 
                           : marbleEvents[i]?.type === 'fall'
                           ? 'scale(0.7) rotate(180deg)'
                           : marbleEvents[i]?.type === 'crash'
                           ? 'scale(0.9)'
-                          : isLeading ? 'scale(1.15)' : 'scale(1)',
+                          : isLeading ? 'scale(1.2)' : 'scale(1)',
                         opacity: marbleEvents[i]?.type === 'fall' ? 0.6 : 1,
                       }}
                     >
+                      {/* Funky pattern overlay - different for each player */}
+                      {!player.pfpUrl && (
+                        <>
+                          {/* Swirl pattern */}
+                          <div 
+                            className="absolute inset-0 rounded-full"
+                            style={{
+                              background: `conic-gradient(from ${i * 72}deg, transparent 0%, ${player.color}40 25%, transparent 50%, ${player.color}40 75%, transparent 100%)`,
+                            }}
+                          />
+                          {/* Radial burst */}
+                          <div 
+                            className="absolute inset-0 rounded-full"
+                            style={{
+                              background: `radial-gradient(circle at ${30 + i * 10}% ${30 + i * 10}%, rgba(255,255,255,0.8) 0%, ${player.color}60 40%, transparent 70%)`,
+                            }}
+                          />
+                          {/* Diagonal stripes */}
+                          <div 
+                            className="absolute inset-0 rounded-full opacity-30"
+                            style={{
+                              background: `repeating-linear-gradient(${i * 45}deg, transparent, transparent 2px, rgba(255,255,255,0.3) 2px, rgba(255,255,255,0.3) 4px)`,
+                            }}
+                          />
+                        </>
+                      )}
                       {/* Event indicators */}
                       {marbleEvents[i]?.type === 'fall' && (
                         <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none z-40">
@@ -1064,26 +1127,58 @@ const MarbleRace = () => {
                           <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-1 h-8 bg-gradient-to-b from-yellow-400 to-transparent opacity-60" />
                         </>
                       )}
-                      {player.pfpUrl && (
+                      {/* Funky effects for all marbles */}
+                      {player.pfpUrl ? (
                         <>
+                          {/* Enhanced shine for profile pictures */}
                           <div
                             className="absolute inset-0 rounded-full pointer-events-none"
                             style={{
-                              background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.5) 0%, transparent 65%)`,
+                              background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7) 0%, transparent 60%)`,
                             }}
                           />
                           <div
                             className="absolute inset-0 rounded-full pointer-events-none"
                             style={{
-                              background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.25) 0%, transparent 65%)`,
+                              background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.3) 0%, transparent 60%)`,
+                            }}
+                          />
+                          {/* Colorful rim glow */}
+                          <div
+                            className="absolute inset-0 rounded-full pointer-events-none"
+                            style={{
+                              border: `2px solid ${player.color}80`,
+                              boxShadow: `inset 0 0 10px ${player.color}40`,
                             }}
                           />
                         </>
-                      )}
-                      {!player.pfpUrl && (
+                      ) : (
                         <>
-                          <div className="absolute w-4 h-4 rounded-full bg-white/80 top-2 left-2 blur-[1px] pointer-events-none" />
-                          <div className="absolute w-3 h-3 rounded-full bg-white/60 top-1 left-1 pointer-events-none" />
+                          {/* Funky pattern for solid color marbles */}
+                          {/* Swirl pattern */}
+                          <div 
+                            className="absolute inset-0 rounded-full pointer-events-none"
+                            style={{
+                              background: `conic-gradient(from ${i * 72}deg, transparent 0%, ${player.color}40 25%, transparent 50%, ${player.color}40 75%, transparent 100%)`,
+                            }}
+                          />
+                          {/* Radial burst */}
+                          <div 
+                            className="absolute inset-0 rounded-full pointer-events-none"
+                            style={{
+                              background: `radial-gradient(circle at ${30 + i * 10}% ${30 + i * 10}%, rgba(255,255,255,0.9) 0%, ${player.color}70 40%, transparent 70%)`,
+                            }}
+                          />
+                          {/* Diagonal stripes */}
+                          <div 
+                            className="absolute inset-0 rounded-full pointer-events-none opacity-40"
+                            style={{
+                              background: `repeating-linear-gradient(${i * 45}deg, transparent, transparent 2px, rgba(255,255,255,0.4) 2px, rgba(255,255,255,0.4) 4px)`,
+                            }}
+                          />
+                          {/* Highlight dots */}
+                          <div className="absolute w-3 h-3 rounded-full bg-white/90 top-2 left-2 blur-[1px] pointer-events-none" />
+                          <div className="absolute w-2 h-2 rounded-full bg-white/70 top-1 left-1 pointer-events-none" />
                         </>
                       )}
                       {isLeading && position < TRACK_LENGTH && (
