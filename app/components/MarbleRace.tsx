@@ -219,57 +219,67 @@ const MarbleRace = () => {
             <span className="text-3xl font-bold text-black tracking-tight">{buyIn} ETH</span>
           </div>
 
-          <div className="grid grid-cols-5 gap-3 w-full mb-6">
-            {players.map((player, i) => (
-              <div 
-                key={i} 
-                className={`bg-white rounded-2xl p-4 flex flex-col items-center gap-2.5 transition-all ${player.isYou ? 'ring-2 ring-blue-500' : ''} ${player.joined ? 'shadow-sm' : 'opacity-50'}`}
-              >
-                {/* Marble with profile picture */}
+          {/* Horse race style lineup */}
+          <div className="w-full bg-white rounded-3xl p-4 shadow-md mb-6">
+            <div className="flex items-center justify-between gap-2">
+              {players.map((player, i) => (
                 <div 
-                  className="w-12 h-12 rounded-full overflow-hidden relative flex-shrink-0"
-                  style={{ 
-                    backgroundColor: player.pfpUrl ? 'transparent' : player.color,
-                    backgroundImage: player.pfpUrl ? `url(${player.pfpUrl})` : undefined,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    boxShadow: player.joined 
-                      ? '0 4px 12px rgba(0,0,0,0.15), inset 0 -4px 8px rgba(0,0,0,0.1), inset 0 4px 8px rgba(255,255,255,0.4)' 
-                      : 'none',
-                    border: player.pfpUrl ? `2.5px solid ${player.color}` : 'none',
-                  }} 
+                  key={i} 
+                  className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-xl transition-all ${player.isYou ? 'bg-blue-50 ring-2 ring-blue-500' : 'bg-neutral-50'} ${player.joined ? '' : 'opacity-40'}`}
                 >
-                  {player.pfpUrl && (
-                    <>
-                      {/* Marble shine effect */}
-                      <div 
-                        className="absolute inset-0 rounded-full"
-                        style={{
-                          background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3) 0%, transparent 60%)`,
-                        }}
-                      />
-                      {/* Marble shadow effect */}
-                      <div 
-                        className="absolute inset-0 rounded-full"
-                        style={{
-                          background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.15) 0%, transparent 60%)`,
-                        }}
-                      />
-                    </>
-                  )}
+                  {/* Marble with profile picture - larger and clearer */}
+                  <div 
+                    className="w-16 h-16 rounded-full overflow-hidden relative flex-shrink-0"
+                    style={{ 
+                      backgroundColor: player.pfpUrl ? 'transparent' : player.color,
+                      backgroundImage: player.pfpUrl ? `url(${player.pfpUrl})` : undefined,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      boxShadow: player.joined 
+                        ? '0 4px 16px rgba(0,0,0,0.2), inset 0 -4px 8px rgba(0,0,0,0.15), inset 0 4px 8px rgba(255,255,255,0.5)' 
+                        : 'none',
+                      border: player.pfpUrl ? `3px solid ${player.color}` : 'none',
+                    }} 
+                  >
+                    {player.pfpUrl && (
+                      <>
+                        {/* Marble shine effect */}
+                        <div 
+                          className="absolute inset-0 rounded-full"
+                          style={{
+                            background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 60%)`,
+                          }}
+                        />
+                        {/* Marble shadow effect */}
+                        <div 
+                          className="absolute inset-0 rounded-full"
+                          style={{
+                            background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.2) 0%, transparent 60%)`,
+                          }}
+                        />
+                      </>
+                    )}
+                    {/* You indicator */}
+                    {player.isYou && (
+                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-[10px] font-bold">YOU</span>
+                      </div>
+                    )}
+                  </div>
+                  {/* Username - clear and full width */}
+                  <div className="w-full flex flex-col items-center gap-1">
+                    <span className={`text-sm font-bold text-center break-all ${player.joined ? 'text-black' : 'text-neutral-400'}`}>
+                      {player.joined ? player.handle : 'waiting'}
+                    </span>
+                    {player.joined && (
+                      <span className="text-[10px] text-neutral-500 font-medium uppercase tracking-wide">
+                        {player.colorName}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                {/* Username - clear and readable */}
-                <span className={`text-xs font-semibold text-center truncate w-full ${player.joined ? 'text-black' : 'text-neutral-400'}`}>
-                  {player.joined ? player.handle : 'waiting'}
-                </span>
-                {/* Color name - smaller */}
-                {player.joined && (
-                  <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-wide">
-                    {player.colorName}
-                  </span>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 mb-8">
