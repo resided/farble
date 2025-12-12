@@ -37,6 +37,8 @@ const MarbleRace = () => {
   const [raceTime, setRaceTime] = useState(0); // Race timer for suspense
   const [speedBursts, setSpeedBursts] = useState<Record<number, number>>({}); // Speed burst effects
   const [ethPriceUsd, setEthPriceUsd] = useState<number | null>(null); // ETH price in USD
+  const [marbleEvents, setMarbleEvents] = useState<Record<number, { type: string; endTime: number }>>({}); // Random race events
+  const [marbleRecovery, setMarbleRecovery] = useState<Record<number, number>>({}); // Recovery from setbacks
 
   const basePlayers: Player[] = useMemo(() => [
     { 
@@ -283,62 +285,135 @@ const MarbleRace = () => {
           const newPositions = prev.map((pos, i) => {
             if (pos >= TRACK_LENGTH) return TRACK_LENGTH;
             
-            // Use VRF seed deterministically for each player's speed
+            // Use VRF seed deterministically for each player's base speed
             // Each player gets a portion of the seed for their base speed
             const seedOffset = i * 8; // Each player uses 8 hex chars (4 bytes)
             const playerSeed = parseInt(seed.slice(seedOffset, seedOffset + 8) || '1', 16);
             
             const frame = Math.floor(timeElapsed / 50); // Frame number
             
-            // Deterministic speed based on seed + frame + position
-            const combinedSeed = (playerSeed + frame * 1000 + Math.floor(pos)) % 100000;
+            // Deterministic speed based on seed + frame + position + time
+            const combinedSeed = (playerSeed + frame * 1000 + Math.floor(pos) + Math.floor(timeElapsed / 100)) % 100000;
             
             // Calculate base speed to finish in ~10 seconds
             // TRACK_LENGTH = 200, 10 seconds = 200 frames (50ms each)
             // Average speed needed: 200/200 = 1.0 per frame
-            // But we want variation and suspense, so speeds range from 0.75 to 1.35
-            // This ensures races finish in 8-12 seconds for suspense
-            const baseSpeed = 0.75 + ((playerSeed % 30000) / 30000) * 0.6; // 0.75 to 1.35
-            const variation = (combinedSeed % 1000) / 1000 * 0.25; // ±0.125 variation
+            // But we want variation and suspense, so speeds range from 0.7 to 1.4
+            const baseSpeed = 0.7 + ((playerSeed % 30000) / 30000) * 0.7; // 0.7 to 1.4
+            const variation = (combinedSeed % 1000) / 1000 * 0.4; // ±0.2 variation (more randomness)
             
-            // Add suspense: speed bursts and slowdowns at strategic points
+            // Check for active events (falling off, crashes, etc.)
+            const currentEvent = marbleEvents[i];
+            const isInEvent = currentEvent && Date.now() < currentEvent.endTime;
+            
+            // Random events can happen during the race
             let speedMultiplier = 1.0;
+            let positionPenalty = 0;
             const progress = pos / TRACK_LENGTH;
             
-            // Speed bursts at certain progress points (create excitement)
-            if (progress > 0.3 && progress < 0.35 && (playerSeed % 100) < 20) {
-              speedMultiplier = 1.5; // Burst of speed
-              setSpeedBursts(prev => ({ ...prev, [i]: Date.now() }));
-            } else if (progress > 0.6 && progress < 0.65 && (playerSeed % 100) < 15) {
-              speedMultiplier = 1.6; // Another burst
-              setSpeedBursts(prev => ({ ...prev, [i]: Date.now() }));
-            } else if (progress > 0.85 && progress < 0.9 && (playerSeed % 100) < 25) {
-              speedMultiplier = 1.4; // Final sprint
-              setSpeedBursts(prev => ({ ...prev, [i]: Date.now() }));
+            // Random events based on seed + time (unpredictable but verifiable)
+            if (!isInEvent && progress > 0.1 && progress < 0.95) {
+              // Chance of random event: 0.5% per frame
+              const eventChance = (combinedSeed + frame * 137) % 10000;
+              
+              if (eventChance < 50) {
+                // Marble falls off track!
+                const eventDuration = 800 + (eventChance % 400); // 800-1200ms
+                setMarbleEvents(prev => ({
+                  ...prev,
+                  [i]: { type: 'fall', endTime: Date.now() + eventDuration }
+                }));
+                positionPenalty = 2 + (eventChance % 3); // Lose 2-4 positions
+              } else if (eventChance < 100) {
+                // Speed boost event
+                const eventDuration = 600 + (eventChance % 300); // 600-900ms
+                setMarbleEvents(prev => ({
+                  ...prev,
+                  [i]: { type: 'boost', endTime: Date.now() + eventDuration }
+                }));
+                setSpeedBursts(prev => ({ ...prev, [i]: Date.now() }));
+                speedMultiplier = 1.8; // Big speed boost
+              } else if (eventChance < 150) {
+                // Crash/slowdown event
+                const eventDuration = 1000 + (eventChance % 500); // 1000-1500ms
+                setMarbleEvents(prev => ({
+                  ...prev,
+                  [i]: { type: 'crash', endTime: Date.now() + eventDuration }
+                }));
+                speedMultiplier = 0.3; // Major slowdown
+              }
             }
             
-            // Slowdowns create tension (some players slow down)
-            if (progress > 0.45 && progress < 0.5 && (playerSeed % 100) > 80) {
-              speedMultiplier = 0.6; // Temporary slowdown
-            } else if (progress > 0.75 && progress < 0.8 && (playerSeed % 100) > 85) {
-              speedMultiplier = 0.7; // Another slowdown
+            // Handle active events
+            if (isInEvent) {
+              if (currentEvent.type === 'fall') {
+                speedMultiplier = 0.1; // Almost stopped while recovering
+              } else if (currentEvent.type === 'crash') {
+                speedMultiplier = 0.4; // Slow recovery
+              } else if (currentEvent.type === 'boost') {
+                speedMultiplier = 1.6; // Speed boost active
+              }
+            } else {
+              // Clear event if it's over
+              if (currentEvent) {
+                setMarbleEvents(prev => {
+                  const newEvents = { ...prev };
+                  delete newEvents[i];
+                  return newEvents;
+                });
+              }
+            }
+            
+            // Speed bursts at certain progress points (create excitement)
+            if (!isInEvent) {
+              if (progress > 0.3 && progress < 0.35 && (playerSeed % 100) < 20) {
+                speedMultiplier = 1.5; // Burst of speed
+                setSpeedBursts(prev => ({ ...prev, [i]: Date.now() }));
+              } else if (progress > 0.6 && progress < 0.65 && (playerSeed % 100) < 15) {
+                speedMultiplier = 1.6; // Another burst
+                setSpeedBursts(prev => ({ ...prev, [i]: Date.now() }));
+              } else if (progress > 0.85 && progress < 0.9 && (playerSeed % 100) < 25) {
+                speedMultiplier = 1.4; // Final sprint
+                setSpeedBursts(prev => ({ ...prev, [i]: Date.now() }));
+              }
+            }
+            
+            // Recovery boost after setbacks
+            if (!isInEvent && marbleRecovery[i] && marbleRecovery[i] > 0) {
+              speedMultiplier *= 1.3; // Recovery boost
+              setMarbleRecovery(prev => {
+                const newRecovery = { ...prev };
+                newRecovery[i] = (newRecovery[i] || 0) - 1;
+                if (newRecovery[i] <= 0) delete newRecovery[i];
+                return newRecovery;
+              });
             }
             
             // Final stretch suspense: speeds converge for close finish
-            if (progress > 0.9) {
-              // In final stretch, speeds become more similar for suspense
+            if (progress > 0.9 && !isInEvent) {
               const leadingPos = Math.max(...prev);
               const distanceFromLead = leadingPos - pos;
-              if (distanceFromLead > 5) {
+              if (distanceFromLead > 8) {
+                speedMultiplier *= 1.2; // Big catch up boost
+              } else if (distanceFromLead > 3) {
                 speedMultiplier *= 1.1; // Catch up boost
-              } else if (distanceFromLead < -2) {
-                speedMultiplier *= 0.95; // Slight slowdown for leader
+              } else if (distanceFromLead < -3) {
+                speedMultiplier *= 0.9; // Slowdown for leader
               }
             }
             
             const speed = (baseSpeed + variation) * speedMultiplier;
+            let newPos = pos + speed - positionPenalty;
             
-            return Math.min(TRACK_LENGTH, pos + speed);
+            // If marble fell off, trigger recovery period
+            if (positionPenalty > 0) {
+              setMarbleRecovery(prev => ({
+                ...prev,
+                [i]: 20 // 20 frames of recovery boost
+              }));
+            }
+            
+            return Math.max(0, Math.min(TRACK_LENGTH, newPos));
           });
           
           // Check for winner - first to cross finish line
@@ -363,6 +438,8 @@ const MarbleRace = () => {
     setCountdown(3);
     setRaceTime(0);
     setSpeedBursts({});
+    setMarbleEvents({});
+    setMarbleRecovery({});
     const countInterval = setInterval(() => {
       setCountdown(prev => {
         if (prev === null || prev <= 1) {
@@ -938,14 +1015,45 @@ const MarbleRace = () => {
                           ? `0 6px 24px ${player.color}dd, 0 3px 12px rgba(0,0,0,0.7), inset 0 -2px 4px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.9)`
                           : '0 3px 12px rgba(0,0,0,0.6), inset 0 -1.5px 3px rgba(0,0,0,0.4), inset 0 1.5px 3px rgba(255,255,255,0.8)',
                         border: player.pfpUrl ? `1.5px solid ${player.color}` : 'none',
-                        filter: isLeading 
+                        filter: marbleEvents[i]?.type === 'fall'
+                          ? 'brightness(0.5) saturate(0.5) drop-shadow(0 0 8px rgba(255,0,0,0.8))'
+                          : marbleEvents[i]?.type === 'crash'
+                          ? 'brightness(0.6) drop-shadow(0 0 6px rgba(255,100,0,0.6))'
+                          : isLeading 
                           ? 'brightness(1.3) saturate(1.5) drop-shadow(0 0 10px rgba(255,215,0,0.9))' 
                           : 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
                         transform: speedBursts[i] && (Date.now() - speedBursts[i]) < 500 
                           ? 'scale(1.2)' 
+                          : marbleEvents[i]?.type === 'fall'
+                          ? 'scale(0.7) rotate(180deg)'
+                          : marbleEvents[i]?.type === 'crash'
+                          ? 'scale(0.9)'
                           : isLeading ? 'scale(1.15)' : 'scale(1)',
+                        opacity: marbleEvents[i]?.type === 'fall' ? 0.6 : 1,
                       }}
                     >
+                      {/* Event indicators */}
+                      {marbleEvents[i]?.type === 'fall' && (
+                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none z-40">
+                          <span className="text-[10px] font-bold text-red-500 bg-white/90 px-2 py-0.5 rounded-full shadow-lg animate-bounce">
+                            💥 Fell off!
+                          </span>
+                        </div>
+                      )}
+                      {marbleEvents[i]?.type === 'crash' && (
+                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none z-40">
+                          <span className="text-[10px] font-bold text-orange-500 bg-white/90 px-2 py-0.5 rounded-full shadow-lg">
+                            ⚠️ Crash!
+                          </span>
+                        </div>
+                      )}
+                      {marbleEvents[i]?.type === 'boost' && (
+                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none z-40">
+                          <span className="text-[10px] font-bold text-green-500 bg-white/90 px-2 py-0.5 rounded-full shadow-lg animate-pulse">
+                            ⚡ Boost!
+                          </span>
+                        </div>
+                      )}
                       {/* Speed Burst Effect - Visual suspense */}
                       {speedBursts[i] && (Date.now() - speedBursts[i]) < 500 && (
                         <>
