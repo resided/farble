@@ -35,6 +35,7 @@ export const metadata: Metadata = {
   other: {
     "farcaster:frame": "vNext",
     "farcaster:frame:image": "/og-image.png",
+    "base:app_id": "693c923410053b1bcb25eedc",
   },
 };
 
