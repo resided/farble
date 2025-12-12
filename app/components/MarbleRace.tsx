@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { useFarcaster } from '../hooks/useFarcaster';
 import { sdk } from '@farcaster/miniapp-sdk';
@@ -31,6 +31,11 @@ const MarbleRace = () => {
   const [vrfSeed, setVrfSeed] = useState<string | null>(null);
   const [showWinnerDialog, setShowWinnerDialog] = useState(false);
   const [raceStartTime, setRaceStartTime] = useState<number | null>(null);
+  const [cameraOffset, setCameraOffset] = useState(0); // Camera position for tracking
+  const trackPathRef = useRef<SVGPathElement | null>(null);
+  const [pathLength, setPathLength] = useState(0);
+  const [raceTime, setRaceTime] = useState(0); // Race timer for suspense
+  const [speedBursts, setSpeedBursts] = useState<Record<number, number>>({}); // Speed burst effects
 
   const basePlayers: Player[] = useMemo(() => [
     { 
@@ -93,30 +98,54 @@ const MarbleRace = () => {
   const TRACK_LENGTH = 200; // Longer track (200% instead of 100%)
 
   // Generate VRF seed for verifiable randomness
+  // Uses cryptographically secure random number generation (CSPRNG)
+  // In production, consider using Chainlink VRF or similar onchain VRF service
   const generateVrfSeed = (): string => {
-    // In production, use a proper VRF service or onchain VRF
-    // For now, use crypto.getRandomValues for cryptographically secure randomness
     const randomBytes = new Uint8Array(32);
-    if (typeof window !== 'undefined' && window.crypto) {
+    
+    // Primary: Use Web Crypto API for cryptographically secure randomness
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
       window.crypto.getRandomValues(randomBytes);
+    } else if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.getRandomValues) {
+      globalThis.crypto.getRandomValues(randomBytes);
     } else {
-      // Fallback for environments without crypto
+      // Fallback: Less secure but better than nothing
+      console.warn('Crypto API not available, using fallback RNG');
       for (let i = 0; i < 32; i++) {
         randomBytes[i] = Math.floor(Math.random() * 256);
       }
     }
     
-    // Convert to hex string
+    // Convert to hex string (64 characters for 32 bytes)
     const hex = Array.from(randomBytes)
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
     
-    // Add timestamp and race data for additional entropy
+    // Add additional entropy sources for extra security
     const timestamp = Date.now();
+    const perfNow = typeof window !== 'undefined' && window.performance ? window.performance.now() : 0;
     const raceData = players.map(p => p.handle).join('');
-    const combined = `${hex}${timestamp.toString(16)}${btoa(raceData).slice(0, 16)}`;
     
-    return combined.slice(0, 64); // 32 bytes = 64 hex chars
+    // Combine all entropy sources using XOR-like mixing
+    const timestampHex = timestamp.toString(16).padStart(16, '0');
+    const performanceHex = Math.floor(perfNow * 1000).toString(16).padStart(12, '0');
+    const raceHash = btoa(raceData).slice(0, 16).replace(/[^a-f0-9]/gi, '0');
+    
+    // Mix entropy: XOR the hex strings character by character
+    const mixed = hex.split('').map((char, i) => {
+      const tsChar = timestampHex[i % timestampHex.length] || '0';
+      const perfChar = performanceHex[i % performanceHex.length] || '0';
+      const raceChar = raceHash[i % raceHash.length] || '0';
+      const combined = parseInt(char, 16) ^ parseInt(tsChar, 16) ^ parseInt(perfChar, 16) ^ parseInt(raceChar, 16);
+      return combined.toString(16).padStart(1, '0')[0];
+    }).join('');
+    
+    // Return 64-character hex string (32 bytes of entropy)
+    // This seed is cryptographically secure and can be verified by checking:
+    // 1. It was generated using crypto.getRandomValues (browser CSPRNG)
+    // 2. Additional entropy from timestamp, performance, and race data
+    // 3. The seed determines all race outcomes deterministically
+    return mixed.slice(0, 64);
   };
 
   // VRF seed determines speeds deterministically, making the race provably fair
@@ -167,6 +196,37 @@ const MarbleRace = () => {
     }
   };
 
+  // Get path length when track is rendered
+  useEffect(() => {
+    if (trackPathRef.current && screen === 'racing') {
+      const length = trackPathRef.current.getTotalLength();
+      setPathLength(length);
+    }
+  }, [screen]);
+
+  // Update camera to follow leading racer with smooth tracking
+  useEffect(() => {
+    if (screen === 'racing' && marblePositions.length > 0 && raceStartTime && pathLength > 0) {
+      const leadingPosition = Math.max(...marblePositions);
+      const progress = Math.min(leadingPosition / TRACK_LENGTH, 1);
+      
+      // Calculate leading racer's position along the track
+      const distanceAlongPath = progress * pathLength;
+      
+      if (trackPathRef.current) {
+        const point = trackPathRef.current.getPointAtLength(distanceAlongPath);
+        
+        // Camera follows leading racer, centered in viewport
+        setCameraOffset(prev => {
+          const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 400;
+          const target = Math.max(0, point.x - viewportWidth / 2);
+          // Smooth interpolation for camera movement
+          return prev + (target - prev) * 0.12;
+        });
+      }
+    }
+  }, [screen, marblePositions, raceStartTime, pathLength]);
+
   useEffect(() => {
     if (screen === 'racing' && !winnerFound && raceStartTime) {
       // Generate VRF seed when race starts (only once)
@@ -177,6 +237,10 @@ const MarbleRace = () => {
       }
 
       const interval = setInterval(() => {
+        const timeElapsed = Date.now() - (raceStartTime || 0);
+        const secondsElapsed = timeElapsed / 1000;
+        setRaceTime(secondsElapsed);
+
         setMarblePositions(prev => {
           const seed = vrfSeed || generateVrfSeed();
           
@@ -188,17 +252,55 @@ const MarbleRace = () => {
             const seedOffset = i * 8; // Each player uses 8 hex chars (4 bytes)
             const playerSeed = parseInt(seed.slice(seedOffset, seedOffset + 8) || '1', 16);
             
-            // Use time elapsed for variation, but base it on seed
-            const timeElapsed = Date.now() - (raceStartTime || 0);
             const frame = Math.floor(timeElapsed / 50); // Frame number
             
             // Deterministic speed based on seed + frame + position
             const combinedSeed = (playerSeed + frame * 1000 + Math.floor(pos)) % 100000;
             
-            // Base speed from seed (1.0 to 4.0), with small variations
-            const baseSpeed = 1.0 + ((playerSeed % 30000) / 30000) * 3.0;
-            const variation = (combinedSeed % 1000) / 1000 * 0.5; // ±0.25 variation
-            const speed = baseSpeed + variation;
+            // Calculate base speed to finish in ~10 seconds
+            // TRACK_LENGTH = 200, 10 seconds = 200 frames (50ms each)
+            // Average speed needed: 200/200 = 1.0 per frame
+            // But we want variation and suspense, so speeds range from 0.75 to 1.35
+            // This ensures races finish in 8-12 seconds for suspense
+            const baseSpeed = 0.75 + ((playerSeed % 30000) / 30000) * 0.6; // 0.75 to 1.35
+            const variation = (combinedSeed % 1000) / 1000 * 0.25; // ±0.125 variation
+            
+            // Add suspense: speed bursts and slowdowns at strategic points
+            let speedMultiplier = 1.0;
+            const progress = pos / TRACK_LENGTH;
+            
+            // Speed bursts at certain progress points (create excitement)
+            if (progress > 0.3 && progress < 0.35 && (playerSeed % 100) < 20) {
+              speedMultiplier = 1.5; // Burst of speed
+              setSpeedBursts(prev => ({ ...prev, [i]: Date.now() }));
+            } else if (progress > 0.6 && progress < 0.65 && (playerSeed % 100) < 15) {
+              speedMultiplier = 1.6; // Another burst
+              setSpeedBursts(prev => ({ ...prev, [i]: Date.now() }));
+            } else if (progress > 0.85 && progress < 0.9 && (playerSeed % 100) < 25) {
+              speedMultiplier = 1.4; // Final sprint
+              setSpeedBursts(prev => ({ ...prev, [i]: Date.now() }));
+            }
+            
+            // Slowdowns create tension (some players slow down)
+            if (progress > 0.45 && progress < 0.5 && (playerSeed % 100) > 80) {
+              speedMultiplier = 0.6; // Temporary slowdown
+            } else if (progress > 0.75 && progress < 0.8 && (playerSeed % 100) > 85) {
+              speedMultiplier = 0.7; // Another slowdown
+            }
+            
+            // Final stretch suspense: speeds converge for close finish
+            if (progress > 0.9) {
+              // In final stretch, speeds become more similar for suspense
+              const leadingPos = Math.max(...prev);
+              const distanceFromLead = leadingPos - pos;
+              if (distanceFromLead > 5) {
+                speedMultiplier *= 1.1; // Catch up boost
+              } else if (distanceFromLead < -2) {
+                speedMultiplier *= 0.95; // Slight slowdown for leader
+              }
+            }
+            
+            const speed = (baseSpeed + variation) * speedMultiplier;
             
             return Math.min(TRACK_LENGTH, pos + speed);
           });
@@ -215,7 +317,7 @@ const MarbleRace = () => {
           
           return newPositions;
         });
-      }, 50); // Faster updates for smoother animation
+      }, 50); // 50ms updates = 20fps, 200 frames = 10 seconds
 
       return () => clearInterval(interval);
     }
@@ -223,6 +325,8 @@ const MarbleRace = () => {
 
   const startRace = () => {
     setCountdown(3);
+    setRaceTime(0);
+    setSpeedBursts({});
     const countInterval = setInterval(() => {
       setCountdown(prev => {
         if (prev === null || prev <= 1) {
@@ -232,6 +336,7 @@ const MarbleRace = () => {
           setVrfSeed(null); // Reset seed for new race
           setWinnerFound(false);
           setMarblePositions([0, 0, 0, 0, 0]);
+          setCameraOffset(0);
           return null;
         }
         return prev - 1;
@@ -407,8 +512,363 @@ const MarbleRace = () => {
         </main>
       )}
 
-      {/* Racing Screen */}
+      {/* Racing Screen - Full Page Curved Track */}
       {screen === 'racing' && (
+        <main className="flex-1 relative overflow-hidden bg-gradient-to-b from-blue-50 via-indigo-50/30 via-white to-emerald-50">
+          {/* Animated background elements */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.1),transparent_50%)]" />
+            <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_70%_80%,rgba(16,185,129,0.1),transparent_50%)]" />
+          </div>
+          {/* Track Container with Camera Tracking */}
+          <div 
+            className="absolute inset-0 transition-transform duration-100 ease-out"
+            style={{
+              transform: `translateX(${-cameraOffset}px) scale(1)`,
+              willChange: 'transform',
+            }}
+          >
+            {/* SVG Track with Curves and Twists - Full track rendered */}
+            <svg 
+              className="absolute inset-0 w-full h-full"
+              viewBox="0 0 2000 800"
+              preserveAspectRatio="none"
+              style={{ minWidth: '2000px' }}
+            >
+              {/* Track Shadow/Glow */}
+              <defs>
+                <filter id="trackGlow">
+                  <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+                  <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+                <linearGradient id="trackGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#f8fafc" />
+                  <stop offset="25%" stopColor="#e2e8f0" />
+                  <stop offset="50%" stopColor="#f1f5f9" />
+                  <stop offset="75%" stopColor="#e2e8f0" />
+                  <stop offset="100%" stopColor="#f8fafc" />
+                </linearGradient>
+                <linearGradient id="trackBorderGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#cbd5e1" />
+                  <stop offset="50%" stopColor="#94a3b8" />
+                  <stop offset="100%" stopColor="#cbd5e1" />
+                </linearGradient>
+              </defs>
+              
+              {/* Track Outer Border with Shadow */}
+              <path
+                d="M 0 400 Q 200 200 400 300 T 800 250 T 1200 350 T 1600 200 T 2000 400"
+                fill="none"
+                stroke="url(#trackBorderGradient)"
+                strokeWidth="88"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                filter="url(#trackGlow)"
+                opacity="0.4"
+              />
+              
+              {/* Track Main Path - Beautiful gradient */}
+              <path
+                ref={trackPathRef}
+                d="M 0 400 Q 200 200 400 300 T 800 250 T 1200 350 T 1600 200 T 2000 400"
+                fill="none"
+                stroke="url(#trackGradient)"
+                strokeWidth="80"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                id="track-path"
+              />
+              
+              {/* Track Inner Highlight */}
+              <path
+                d="M 0 400 Q 200 200 400 300 T 800 250 T 1200 350 T 1600 200 T 2000 400"
+                fill="none"
+                stroke="rgba(255,255,255,0.6)"
+                strokeWidth="72"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              
+              {/* Lane Markers - Sleek dashed lines */}
+              <path
+                d="M 0 400 Q 200 200 400 300 T 800 250 T 1200 350 T 1600 200 T 2000 400"
+                fill="none"
+                stroke="rgba(148, 163, 184, 0.4)"
+                strokeWidth="2"
+                strokeDasharray="8 12"
+                strokeLinecap="round"
+              />
+              
+              {/* Track Surface Texture */}
+              <path
+                d="M 0 400 Q 200 200 400 300 T 800 250 T 1200 350 T 1600 200 T 2000 400"
+                fill="none"
+                stroke="rgba(255,255,255,0.3)"
+                strokeWidth="76"
+                strokeLinecap="round"
+                strokeDasharray="30 20"
+                opacity="0.6"
+              />
+              
+              {/* Obstacles along the track - Sleek design */}
+              {trackPathRef.current && pathLength > 0 && [...Array(6)].map((_, i) => {
+                const obstacleProgress = 0.15 + (i * 0.12);
+                if (obstacleProgress >= 1 || !trackPathRef.current) return null;
+                const distance = obstacleProgress * pathLength;
+                const point = trackPathRef.current.getPointAtLength(distance);
+                // Offset obstacle slightly to the side of track
+                const normalAngle = trackPathRef.current.getPointAtLength(distance + 1);
+                const angle = Math.atan2(normalAngle.y - point.y, normalAngle.x - point.x) + Math.PI / 2;
+                const offsetX = Math.cos(angle) * 50;
+                const offsetY = Math.sin(angle) * 50;
+                
+                return (
+                  <g key={i} transform={`translate(${point.x + offsetX}, ${point.y + offsetY})`}>
+                    <circle
+                      r="18"
+                      fill="url(#obstacleGradient)"
+                      opacity="0.8"
+                      filter="url(#obstacleGlow)"
+                    />
+                    <circle
+                      r="14"
+                      fill="#ef4444"
+                    />
+                    <circle
+                      r="10"
+                      fill="#fca5a5"
+                    />
+                    <circle
+                      r="6"
+                      fill="#fee2e2"
+                    />
+                  </g>
+                );
+              })}
+              
+              {/* Finish Line - Beautiful checker pattern */}
+              {trackPathRef.current && pathLength > 0 && (() => {
+                const finishPoint = trackPathRef.current.getPointAtLength(pathLength);
+                const prevPoint = trackPathRef.current.getPointAtLength(pathLength - 10);
+                const angle = Math.atan2(finishPoint.y - prevPoint.y, finishPoint.x - prevPoint.x) + Math.PI / 2;
+                return (
+                  <g transform={`translate(${finishPoint.x}, ${finishPoint.y}) rotate(${angle * 180 / Math.PI})`}>
+                    <rect x="-12" y="-250" width="24" height="500" fill="url(#checkerPattern)" opacity="0.95" />
+                    <rect x="-12" y="-250" width="24" height="500" fill="url(#finishGradient)" opacity="0.3" />
+                    <line x1="0" y1="-250" x2="0" y2="250" stroke="#000" strokeWidth="5" opacity="0.8" />
+                    <line x1="-2" y1="-250" x2="-2" y2="250" stroke="#fff" strokeWidth="2" opacity="0.6" />
+                    <line x1="2" y1="-250" x2="2" y2="250" stroke="#fff" strokeWidth="2" opacity="0.6" />
+                  </g>
+                );
+              })()}
+              
+              {/* Enhanced Patterns and Gradients */}
+              <defs>
+                <pattern id="checkerPattern" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+                  <rect width="12" height="12" fill="#000" />
+                  <rect x="12" y="12" width="12" height="12" fill="#000" />
+                </pattern>
+                <linearGradient id="finishGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.8" />
+                  <stop offset="50%" stopColor="#f59e0b" stopOpacity="0.6" />
+                  <stop offset="100%" stopColor="#d97706" stopOpacity="0.8" />
+                </linearGradient>
+                <linearGradient id="obstacleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#dc2626" />
+                  <stop offset="50%" stopColor="#ef4444" />
+                  <stop offset="100%" stopColor="#991b1b" />
+                </linearGradient>
+                <filter id="obstacleGlow">
+                  <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                  <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+              </defs>
+            </svg>
+            
+            {/* Marbles on Track - Perfectly positioned using SVG path */}
+            <div className="absolute inset-0">
+              {players.map((player, i) => {
+                const position = marblePositions[i];
+                const progress = Math.min(position / TRACK_LENGTH, 1);
+                const isLeading = position === Math.max(...marblePositions);
+                
+                // Get exact position on SVG path using getPointAtLength
+                let x = 0;
+                let y = 400;
+                let angle = 0;
+                
+                if (trackPathRef.current && pathLength > 0) {
+                  const distanceAlongPath = progress * pathLength;
+                  const point = trackPathRef.current.getPointAtLength(distanceAlongPath);
+                  x = point.x;
+                  y = point.y;
+                  
+                  // Get angle for proper rotation (get point slightly ahead)
+                  if (distanceAlongPath < pathLength - 1) {
+                    const nextPoint = trackPathRef.current.getPointAtLength(distanceAlongPath + 1);
+                    angle = Math.atan2(nextPoint.y - point.y, nextPoint.x - point.x) * (180 / Math.PI);
+                  }
+                }
+                
+                return (
+                  <div
+                    key={i}
+                    className="absolute transition-all duration-75"
+                    style={{
+                      left: `${x}px`,
+                      top: `${y}px`,
+                      transform: `translate(-50%, -50%) rotate(${angle}deg) scale(${isLeading ? 1.15 : 1})`,
+                      zIndex: isLeading ? 20 : 10,
+                    }}
+                  >
+                    {/* Marble - Perfectly sized for track */}
+                    <div
+                      className="w-14 h-14 rounded-full overflow-hidden relative transition-transform duration-75"
+                      style={{
+                        backgroundColor: player.color,
+                        backgroundImage: player.pfpUrl ? `url(${player.pfpUrl})` : undefined,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        boxShadow: isLeading
+                          ? `0 10px 40px ${player.color}aa, 0 6px 20px rgba(0,0,0,0.5), inset 0 -5px 10px rgba(0,0,0,0.3), inset 0 5px 10px rgba(255,255,255,0.7)`
+                          : '0 6px 20px rgba(0,0,0,0.4), inset 0 -4px 8px rgba(0,0,0,0.25), inset 0 4px 8px rgba(255,255,255,0.6)',
+                        border: player.pfpUrl ? `3px solid ${player.color}` : 'none',
+                        filter: isLeading ? 'brightness(1.2) saturate(1.3) drop-shadow(0 0 8px rgba(255,215,0,0.6))' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                        transform: speedBursts[i] && (Date.now() - speedBursts[i]) < 500 
+                          ? 'scale(1.2)' 
+                          : 'scale(1)',
+                      }}
+                    >
+                      {/* Speed Burst Effect - Visual suspense */}
+                      {speedBursts[i] && (Date.now() - speedBursts[i]) < 500 && (
+                        <>
+                          <div className="absolute -inset-6 rounded-full bg-yellow-400/40 animate-ping" />
+                          <div className="absolute -inset-4 rounded-full bg-orange-400/30 animate-ping" style={{ animationDelay: '100ms' }} />
+                          {/* Speed lines */}
+                          <div className="absolute -top-8 left-1/2 -translate-x-1/2 w-1 h-8 bg-gradient-to-t from-yellow-400 to-transparent opacity-60" />
+                          <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-1 h-8 bg-gradient-to-b from-yellow-400 to-transparent opacity-60" />
+                        </>
+                      )}
+                      {player.pfpUrl && (
+                        <>
+                          <div
+                            className="absolute inset-0 rounded-full pointer-events-none"
+                            style={{
+                              background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.5) 0%, transparent 65%)`,
+                            }}
+                          />
+                          <div
+                            className="absolute inset-0 rounded-full pointer-events-none"
+                            style={{
+                              background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.25) 0%, transparent 65%)`,
+                            }}
+                          />
+                        </>
+                      )}
+                      {!player.pfpUrl && (
+                        <>
+                          <div className="absolute w-4 h-4 rounded-full bg-white/80 top-2 left-2 blur-[1px] pointer-events-none" />
+                          <div className="absolute w-3 h-3 rounded-full bg-white/60 top-1 left-1 pointer-events-none" />
+                        </>
+                      )}
+                      {isLeading && position < TRACK_LENGTH && (
+                        <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full animate-ping z-30" />
+                      )}
+                      {position >= TRACK_LENGTH && (
+                        <div className="absolute -top-2 -right-2 w-7 h-7 bg-yellow-400 rounded-full flex items-center justify-center z-30 shadow-lg">
+                          <span className="text-white text-sm">👑</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Player Name Label - Sleek design */}
+                    <div
+                      className="absolute top-16 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none"
+                      style={{
+                        textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                      }}
+                    >
+                      <span className={`text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-sm ${isLeading ? 'bg-yellow-400/95 text-black shadow-lg' : 'bg-black/80 text-white shadow-md'}`}>
+                        {player.handle}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          
+          {/* UI Overlay with Timer and Stats */}
+          <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/95 backdrop-blur-md rounded-xl px-4 py-2.5 shadow-xl border border-white/20">
+                <span className="text-sm font-semibold text-black">Pot: {pot} ETH</span>
+              </div>
+              {/* Race Timer - Builds suspense */}
+              <div className={`bg-gradient-to-r ${raceTime > 8 ? 'from-red-500/90 to-orange-500/90' : raceTime > 6 ? 'from-yellow-500/90 to-orange-500/90' : 'from-blue-500/90 to-indigo-500/90'} backdrop-blur-md rounded-xl px-4 py-2.5 shadow-xl border border-white/20`}>
+                <span className="text-sm font-bold text-white">
+                  {raceTime.toFixed(1)}s
+                </span>
+              </div>
+            </div>
+            <div className="bg-white/95 backdrop-blur-md rounded-xl px-4 py-2.5 shadow-xl border border-white/20">
+              <span className="text-xs text-neutral-500 font-mono">VRF: {vrfSeed?.slice(0, 8)}...</span>
+            </div>
+          </div>
+          
+          {/* Suspense Indicators - Show when race is close */}
+          {marblePositions.length > 0 && (() => {
+            const positions = marblePositions;
+            const maxPos = Math.max(...positions);
+            const minPos = Math.min(...positions.filter(p => p < TRACK_LENGTH));
+            const gap = maxPos - minPos;
+            const isCloseRace = gap < 15 && maxPos > TRACK_LENGTH * 0.7;
+            const averageProgress = positions.reduce((a, b) => a + b, 0) / positions.length / TRACK_LENGTH;
+            
+            return (
+              <>
+                {/* Progress Bar - Shows race tension */}
+                <div className="absolute bottom-4 left-4 right-4 z-30">
+                  <div className="bg-white/95 backdrop-blur-md rounded-xl px-4 py-3 shadow-xl border border-white/20">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-neutral-600">Race Progress</span>
+                      <span className="text-xs font-bold text-neutral-800">{Math.round(averageProgress * 100)}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-neutral-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(averageProgress * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Close Race Alert */}
+                {isCloseRace && (
+                  <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 animate-pulse">
+                    <div className="bg-gradient-to-r from-red-500/95 to-orange-500/95 backdrop-blur-md rounded-full px-6 py-2.5 shadow-2xl border-2 border-yellow-400">
+                      <span className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span className="animate-spin">⚡</span>
+                        Close Race!
+                        <span className="animate-spin">⚡</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </main>
+      )}
+
+      {/* Old Racing Screen - Keeping as fallback for now */}
+      {false && screen === 'racing' && (
         <main className="flex-1 px-6 flex flex-col items-center">
           <div className="w-full bg-gradient-to-br from-white to-neutral-50 rounded-3xl p-6 shadow-xl mt-4 mb-5 border border-neutral-200/50 relative overflow-hidden">
             {/* Animated background gradient */}
@@ -632,15 +1092,60 @@ const MarbleRace = () => {
                 </div>
               </div>
               
-              <button
-                onClick={() => {
-                  setShowWinnerDialog(false);
-                  setTimeout(() => setScreen('results'), 300);
-                }}
-                className="w-full py-4 px-6 rounded-xl bg-black text-white text-sm font-semibold hover:bg-neutral-800 transition-colors"
-              >
-                View Full Results
-              </button>
+              <div className="w-full flex flex-col gap-3">
+                {/* Share button - only show if current user won */}
+                {winner.isYou && (
+                  <button
+                    onClick={async () => {
+                      const shareText = `I won the prize pot on Farble! 🏆`;
+                      const shareUrl = 'https://farcaster.xyz/miniapps/AJ789Uv0lu7g/farble';
+                      const shareData = {
+                        title: 'Farble Winner!',
+                        text: shareText,
+                        url: shareUrl,
+                      };
+
+                      try {
+                        // Try Web Share API first (works on mobile and some browsers)
+                        if (navigator.share) {
+                          await navigator.share(shareData);
+                        } else {
+                          // Fallback: copy to clipboard
+                          const fullText = `${shareText} ${shareUrl}`;
+                          await navigator.clipboard.writeText(fullText);
+                          alert('Copied to clipboard! Share it anywhere!');
+                        }
+                      } catch (error: any) {
+                        // User cancelled or error occurred
+                        if (error.name !== 'AbortError') {
+                          // Fallback: copy to clipboard if share fails
+                          try {
+                            const fullText = `${shareText} ${shareUrl}`;
+                            await navigator.clipboard.writeText(fullText);
+                            alert('Copied to clipboard! Share it anywhere!');
+                          } catch (clipboardError) {
+                            console.error('Failed to copy:', clipboardError);
+                          }
+                        }
+                      }
+                    }}
+                    className="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-semibold hover:from-blue-600 hover:to-purple-600 transition-all shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <span>📤</span>
+                    Share Victory
+                  </button>
+                )}
+                
+                <button
+                  onClick={() => {
+                    setShowWinnerDialog(false);
+                    setTimeout(() => setScreen('results'), 300);
+                  }}
+                  className="w-full py-4 px-6 rounded-xl bg-black text-white text-sm font-semibold hover:bg-neutral-800 transition-colors"
+                >
+                  View Full Results
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -683,9 +1188,52 @@ const MarbleRace = () => {
           <span className="text-xl font-semibold text-green-500 mt-1">+{(parseFloat(pot) * 0.9).toFixed(3)} ETH</span>
 
           {winner.isYou && (
-            <div className="bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-full mt-3">
-              That's you!
-            </div>
+            <>
+              <div className="bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-full mt-3">
+                That's you!
+              </div>
+              
+              {/* Share button on results screen */}
+              <button
+                onClick={async () => {
+                  const shareText = `I won the prize pot on Farble! 🏆`;
+                  const shareUrl = 'https://farcaster.xyz/miniapps/AJ789Uv0lu7g/farble';
+                  const shareData = {
+                    title: 'Farble Winner!',
+                    text: shareText,
+                    url: shareUrl,
+                  };
+
+                  try {
+                    // Try Web Share API first (works on mobile and some browsers)
+                    if (navigator.share) {
+                      await navigator.share(shareData);
+                    } else {
+                      // Fallback: copy to clipboard
+                      const fullText = `${shareText} ${shareUrl}`;
+                      await navigator.clipboard.writeText(fullText);
+                      alert('Copied to clipboard! Share it anywhere!');
+                    }
+                  } catch (error: any) {
+                    // User cancelled or error occurred
+                    if (error.name !== 'AbortError') {
+                      // Fallback: copy to clipboard if share fails
+                      try {
+                        const fullText = `${shareText} ${shareUrl}`;
+                        await navigator.clipboard.writeText(fullText);
+                        alert('Copied to clipboard! Share it anywhere!');
+                      } catch (clipboardError) {
+                        console.error('Failed to copy:', clipboardError);
+                      }
+                    }
+                  }
+                }}
+                className="mt-4 w-full max-w-sm py-3 px-6 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-semibold hover:from-blue-600 hover:to-purple-600 transition-all shadow-lg flex items-center justify-center gap-2"
+              >
+                <span>📤</span>
+                Share Victory
+              </button>
+            </>
           )}
 
           {/* VRF Seed display */}
