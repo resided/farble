@@ -39,6 +39,7 @@ const MarbleRace = () => {
   const [ethPriceUsd, setEthPriceUsd] = useState<number | null>(null); // ETH price in USD
   const [marbleEvents, setMarbleEvents] = useState<Record<number, { type: string; endTime: number }>>({}); // Random race events
   const [marbleRecovery, setMarbleRecovery] = useState<Record<number, number>>({}); // Recovery from setbacks
+  const [isRaceStarting, setIsRaceStarting] = useState(false); // Prevent multiple start clicks
 
   const basePlayers: Player[] = useMemo(() => [
     { 
@@ -79,8 +80,10 @@ const MarbleRace = () => {
     // Fetch immediately
     fetchEthPrice();
     
-    // Refresh price every 10 seconds for live updates
-    const interval = setInterval(fetchEthPrice, 10000);
+    // Update every 30 seconds
+    const interval = setInterval(fetchEthPrice, 30000);
+    
+    return () => clearInterval(interval);
     
     return () => clearInterval(interval);
   }, []);
@@ -431,6 +434,12 @@ const MarbleRace = () => {
   }, [screen, winnerFound, vrfSeed, raceStartTime, players]);
 
   const startRace = () => {
+    // Prevent multiple calls
+    if (isRaceStarting || countdown !== null || screen === 'racing') {
+      return;
+    }
+    
+    setIsRaceStarting(true);
     setCountdown(3);
     setRaceTime(0);
     setSpeedBursts({});
@@ -446,6 +455,7 @@ const MarbleRace = () => {
           setWinnerFound(false);
           setMarblePositions([0, 0, 0, 0, 0]);
           setCameraOffset(0);
+          setIsRaceStarting(false); // Reset flag when race actually starts
           return null;
         }
         return prev - 1;
@@ -462,6 +472,7 @@ const MarbleRace = () => {
     setVrfSeed(null);
     setShowWinnerDialog(false);
     setRaceStartTime(null);
+    setIsRaceStarting(false); // Reset race starting flag
   };
 
   const sortedPlayers = [...players]
@@ -495,7 +506,7 @@ const MarbleRace = () => {
             <button 
               className="px-4 py-2 rounded-lg bg-black text-white text-sm font-semibold hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
               onClick={handleJoinRace}
-              disabled={isPaying}
+              disabled={isPaying || isRaceStarting || countdown !== null}
             >
               {isPaying ? (
                 <span className="flex items-center gap-1.5">
@@ -688,7 +699,7 @@ const MarbleRace = () => {
               willChange: 'transform',
             }}
           >
-            {/* SVG Track - Simple vertical path */}
+            {/* SVG Track - Vertical with gentle curves */}
             <svg 
               className="absolute top-0 left-1/2 -translate-x-1/2"
               viewBox="0 0 400 4000"
@@ -705,27 +716,14 @@ const MarbleRace = () => {
                 </filter>
               </defs>
               
-              {/* Snakes and Ladders style zigzag track path */}
-              {/* Goes: right, down, left, down, right, down, left, down, right, down, left, down, right */}
-              {/* Simplified path that's easier to follow */}
+              {/* Track path - Vertical with gentle curves for visual interest */}
               <path
                 ref={trackPathRef}
-                d="M 200 150 
-                   L 1800 150 
-                   L 1800 250 
-                   L 200 250 
-                   L 200 350 
-                   L 1800 350 
-                   L 1800 450 
-                   L 200 450 
-                   L 200 550 
-                   L 1800 550 
-                   L 1800 650 
-                   L 200 650 
-                   L 200 700
-                   L 1800 700
-                   L 1800 750
-                   L 3800 750"
+                d="M 200 0 
+                   Q 180 500 200 1000
+                   Q 220 1500 200 2000
+                   Q 180 2500 200 3000
+                   Q 220 3500 200 4000"
                 fill="none"
                 stroke="#374151"
                 strokeWidth="88"
@@ -736,22 +734,11 @@ const MarbleRace = () => {
               
               {/* Track Base - Dark asphalt */}
               <path
-                d="M 200 150 
-                   L 1800 150 
-                   L 1800 250 
-                   L 200 250 
-                   L 200 350 
-                   L 1800 350 
-                   L 1800 450 
-                   L 200 450 
-                   L 200 550 
-                   L 1800 550 
-                   L 1800 650 
-                   L 200 650 
-                   L 200 700
-                   L 1800 700
-                   L 1800 750
-                   L 3800 750"
+                d="M 200 0 
+                   Q 180 500 200 1000
+                   Q 220 1500 200 2000
+                   Q 180 2500 200 3000
+                   Q 220 3500 200 4000"
                 fill="none"
                 stroke="#1f2937"
                 strokeWidth="100"
@@ -761,83 +748,56 @@ const MarbleRace = () => {
               
               {/* Track Outer Border - White lines */}
               <path
-                d="M 200 150 
-                   L 1800 150 
-                   L 1800 250 
-                   L 200 250 
-                   L 200 350 
-                   L 1800 350 
-                   L 1800 450 
-                   L 200 450 
-                   L 200 550 
-                   L 1800 550 
-                   L 1800 650 
-                   L 200 650 
-                   L 200 700
-                   L 1800 700
-                   L 1800 750
-                   L 3800 750"
+                d="M 200 0 
+                   Q 180 500 200 1000
+                   Q 220 1500 200 2000
+                   Q 180 2500 200 3000
+                   Q 220 3500 200 4000"
                 fill="none"
                 stroke="#ffffff"
-                strokeWidth="8"
+                strokeWidth="76"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                opacity="0.3"
               />
               
               {/* Track Inner Border - White lines */}
               <path
-                d="M 200 150 
-                   L 1800 150 
-                   L 1800 250 
-                   L 200 250 
-                   L 200 350 
-                   L 1800 350 
-                   L 1800 450 
-                   L 200 450 
-                   L 200 550 
-                   L 1800 550 
-                   L 1800 650 
-                   L 200 650 
-                   L 200 700
-                   L 1800 700
-                   L 1800 750
-                   L 3800 750"
+                d="M 200 0 
+                   Q 180 500 200 1000
+                   Q 220 1500 200 2000
+                   Q 180 2500 200 3000
+                   Q 220 3500 200 4000"
                 fill="none"
                 stroke="#ffffff"
                 strokeWidth="6"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                opacity="0.5"
               />
               
               {/* Center Line - Yellow dashed */}
               <path
-                d="M 200 150 
-                   L 1800 150 
-                   L 1800 250 
-                   L 200 250 
-                   L 200 350 
-                   L 1800 350 
-                   L 1800 450 
-                   L 200 450 
-                   L 200 550 
-                   L 1800 550 
-                   L 1800 650 
-                   L 200 650 
-                   L 200 700
-                   L 1800 700
-                   L 1800 750
-                   L 3800 750"
+                d="M 200 0 
+                   Q 180 500 200 1000
+                   Q 220 1500 200 2000
+                   Q 180 2500 200 3000
+                   Q 220 3500 200 4000"
                 fill="none"
                 stroke="#fbbf24"
                 strokeWidth="4"
-                strokeDasharray="25 20"
+                strokeDasharray="20 20"
                 strokeLinecap="round"
-                opacity="0.95"
+                opacity="0.8"
               />
               
               {/* Track Texture - Subtle road markings */}
               <path
-                d="M 200 0 L 200 4000"
+                d="M 200 0 
+                   Q 180 500 200 1000
+                   Q 220 1500 200 2000
+                   Q 180 2500 200 3000
+                   Q 220 3500 200 4000"
                 fill="none"
                 stroke="rgba(255,255,255,0.15)"
                 strokeWidth="84"
@@ -888,9 +848,12 @@ const MarbleRace = () => {
               {/* Finish Line - At the end of the track */}
               {trackPathRef.current && pathLength > 0 && (() => {
                 const finishPoint = trackPathRef.current.getPointAtLength(pathLength);
+                const prevPoint = trackPathRef.current.getPointAtLength(pathLength - 10);
+                const finishAngle = Math.atan2(finishPoint.y - prevPoint.y, finishPoint.x - prevPoint.x) * 180 / Math.PI;
+                const perpendicularAngle = finishAngle + 90;
                 return (
-                  <g transform={`translate(${finishPoint.x}, ${finishPoint.y})`}>
-                    {/* Finish line base - horizontal line */}
+                  <g transform={`translate(${finishPoint.x}, ${finishPoint.y}) rotate(${perpendicularAngle})`}>
+                    {/* Finish line base - perpendicular to track */}
                     <rect x="-150" y="-15" width="300" height="30" fill="url(#checkerPattern)" opacity="1" />
                     {/* Finish line glow */}
                     <rect x="-150" y="-15" width="300" height="30" fill="url(#finishGradient)" opacity="0.4" />
@@ -899,7 +862,7 @@ const MarbleRace = () => {
                     <line x1="-150" y1="-3" x2="150" y2="-3" stroke="#fff" strokeWidth="2" opacity="0.8" />
                     <line x1="-150" y1="3" x2="150" y2="3" stroke="#fff" strokeWidth="2" opacity="0.8" />
                     {/* Finish flag effect */}
-                    <rect x="-200" y="-10" width="20" height="400" fill="url(#finishFlag)" opacity="0.8" />
+                    <rect x="5" y="-200" width="20" height="400" fill="url(#finishFlag)" opacity="0.8" />
                   </g>
                 );
               })()}
@@ -947,15 +910,19 @@ const MarbleRace = () => {
                 // Get exact position on SVG path using getPointAtLength
                 let x = 200;
                 let y = 0;
-                let angle = 90; // Vertical track, marbles point down
+                let angle = 90; // Default: point down
                 
                 if (trackPathRef.current && pathLength > 0) {
                   const distanceAlongPath = progress * pathLength;
                   const point = trackPathRef.current.getPointAtLength(distanceAlongPath);
                   x = point.x;
                   y = point.y;
-                  // Angle is always 90 degrees (straight down) for vertical track
-                  angle = 90;
+                  
+                  // Calculate angle based on track direction
+                  if (distanceAlongPath < pathLength - 1) {
+                    const nextPoint = trackPathRef.current.getPointAtLength(distanceAlongPath + 1);
+                    angle = Math.atan2(nextPoint.y - point.y, nextPoint.x - point.x) * (180 / Math.PI);
+                  }
                 }
                 
                 return (
