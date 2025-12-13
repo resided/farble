@@ -336,4 +336,3 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
     </div>
   );
 }
-
