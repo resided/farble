@@ -268,8 +268,9 @@ const MarbleRace = () => {
           setCameraOffset(prev => {
             const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
             
-            // Center the racer vertically in viewport with offset for better framing
-            const targetY = Math.max(0, targetPoint.y - viewportHeight / 2 - 150); // Offset down for better view
+          // Zoomed out view - show more of the track for better spectator experience
+          // Show about 60% of viewport height to keep more track visible
+          const targetY = Math.max(0, targetPoint.y - viewportHeight * 0.3); // Zoomed out - show more track
             
             // Very smooth, slow interpolation for cinematic feel (0.03 = very smooth and slow)
             const smoothingFactor = 0.03;
@@ -335,12 +336,12 @@ const MarbleRace = () => {
             // Deterministic speed based on seed + frame + position + time
             const combinedSeed = (playerSeed + frame * 1000 + Math.floor(pos) + Math.floor(timeElapsed / 100)) % 100000;
             
-            // Calculate base speed to finish in ~10 seconds
-            // TRACK_LENGTH = 200, 10 seconds = 200 frames (50ms each)
-            // Average speed needed: 200/200 = 1.0 per frame
-            // But we want variation and suspense, so speeds range from 0.7 to 1.4
-            const baseSpeed = 0.7 + ((playerSeed % 30000) / 30000) * 0.7; // 0.7 to 1.4
-            const variation = (combinedSeed % 1000) / 1000 * 0.4; // ±0.2 variation (more randomness)
+            // Calculate base speed to finish in ~20 seconds
+            // TRACK_LENGTH = 200, 20 seconds = 400 frames (50ms each)
+            // Average speed needed: 200/400 = 0.5 per frame
+            // But we want variation and suspense, so speeds range from 0.35 to 0.7 (half of previous for 20s race)
+            const baseSpeed = 0.35 + ((playerSeed % 30000) / 30000) * 0.35; // 0.35 to 0.7 for 20 second race
+            const variation = (combinedSeed % 1000) / 1000 * 0.2; // ±0.1 variation (adjusted for slower race)
             
             // Check for active events (falling off, crashes, etc.)
             const currentEvent = marbleEvents[i];
@@ -468,7 +469,7 @@ const MarbleRace = () => {
           
           return newPositions;
         });
-      }, 50); // 50ms updates = 20fps, 200 frames = 10 seconds
+      }, 50); // 50ms updates = 20fps, 400 frames = 20 seconds
 
       return () => clearInterval(interval);
     }
@@ -726,11 +727,38 @@ const MarbleRace = () => {
 
       {/* Racing Screen - Full Page Curved Track */}
       {screen === 'racing' && (
-        <main className="flex-1 relative overflow-hidden bg-gradient-to-b from-blue-50 via-indigo-50/30 via-white to-emerald-50">
-          {/* Animated background elements */}
+        <main className="flex-1 relative overflow-hidden bg-gradient-to-b from-sky-100 via-blue-50 to-emerald-50">
+          {/* Stadium atmosphere - Sky and stadium stands */}
           <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.1),transparent_50%)]" />
-            <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_70%_80%,rgba(16,185,129,0.1),transparent_50%)]" />
+            {/* Sky gradient */}
+            <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-b from-blue-200 via-sky-100 to-transparent" />
+            
+            {/* Stadium stands - left side */}
+            <div className="absolute left-0 top-0 w-24 h-full bg-gradient-to-r from-gray-800 via-gray-700 to-transparent opacity-30">
+              <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_8px,rgba(255,255,255,0.1)_8px,rgba(255,255,255,0.1)_10px)]" />
+            </div>
+            
+            {/* Stadium stands - right side */}
+            <div className="absolute right-0 top-0 w-24 h-full bg-gradient-to-l from-gray-800 via-gray-700 to-transparent opacity-30">
+              <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_8px,rgba(255,255,255,0.1)_8px,rgba(255,255,255,0.1)_10px)]" />
+            </div>
+            
+            {/* Spectator silhouettes - animated */}
+            <div className="absolute left-4 top-1/4 w-16 h-32 opacity-20">
+              <div className="absolute bottom-0 w-full h-8 bg-gray-900 rounded-t-full" />
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-6 h-6 bg-gray-900 rounded-full" />
+            </div>
+            <div className="absolute right-4 top-1/3 w-16 h-32 opacity-20">
+              <div className="absolute bottom-0 w-full h-8 bg-gray-900 rounded-t-full" />
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-6 h-6 bg-gray-900 rounded-full" />
+            </div>
+            
+            {/* Stadium lights effect */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-32 bg-gradient-to-b from-yellow-200/20 via-transparent to-transparent" />
+            
+            {/* Animated background elements */}
+            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.08),transparent_50%)]" />
+            <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_70%_80%,rgba(16,185,129,0.08),transparent_50%)]" />
           </div>
           {/* Track Container with Camera Tracking */}
           <div 
