@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Physics, RigidBody, useRapier } from '@react-three/rapier';
 import { OrbitControls, PerspectiveCamera, Environment, ContactShadows, Text } from '@react-three/drei';
@@ -33,7 +33,9 @@ function Marble({
   isLeading,
   onPositionUpdate,
   initialVelocity,
-  raceStartTime
+  raceStartTime,
+  speedMultiplier,
+  obstacles
 }: { 
   player: Player; 
   position: [number, number, number]; 
@@ -42,16 +44,28 @@ function Marble({
   onPositionUpdate?: (pos: THREE.Vector3) => void;
   initialVelocity?: [number, number, number];
   raceStartTime: number | null;
+  speedMultiplier?: number;
+  obstacles?: Array<{ z: number; type: string }>;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const rigidBodyRef = useRef<any>(null);
   const hasStarted = useRef(false);
   const lastUpdateTime = useRef(0);
+  const baseSpeedRef = useRef(0);
+  const lastVelocityRef = useRef<[number, number, number] | undefined>(undefined);
+
+  // Calculate base speed from initial velocity
+  useEffect(() => {
+    if (initialVelocity) {
+      baseSpeedRef.current = Math.abs(initialVelocity[2]) || 0.7;
+    }
+  }, [initialVelocity]);
 
   // Apply initial velocity when race starts
   useEffect(() => {
     if (raceStartTime && rigidBodyRef.current && !hasStarted.current && initialVelocity) {
       hasStarted.current = true;
+      baseSpeedRef.current = Math.abs(initialVelocity[2]) || 0.7;
       // Use requestAnimationFrame to ensure physics is ready
       requestAnimationFrame(() => {
         if (rigidBodyRef.current) {
@@ -61,14 +75,51 @@ function Marble({
     }
   }, [raceStartTime, initialVelocity]);
 
-  // Update position every frame using useFrame
+  // Continuous forward force and dynamic events
   useFrame((state, delta) => {
-    if (rigidBodyRef.current && onPositionUpdate) {
+    if (!rigidBodyRef.current || !raceStartTime) return;
+
+    const pos = rigidBodyRef.current.translation();
+    const currentVel = rigidBodyRef.current.linvel();
+    
+    // Calculate effective speed multiplier (default 1.0, can be modified by events)
+    let effectiveMultiplier = speedMultiplier || 1.0;
+    
+    // Check for obstacles at current position
+    if (obstacles) {
+      obstacles.forEach(obstacle => {
+        const distanceToObstacle = Math.abs(pos.z - obstacle.z);
+        if (distanceToObstacle < 0.5) {
+          if (obstacle.type === 'bump') {
+            // Bump obstacle - slight upward force
+            rigidBodyRef.current.applyImpulse(new THREE.Vector3(0, 0.2, 0), true);
+          } else if (obstacle.type === 'slow') {
+            // Slow obstacle - reduce speed
+            effectiveMultiplier *= 0.5;
+          } else if (obstacle.type === 'boost') {
+            // Boost obstacle - increase speed
+            effectiveMultiplier *= 1.5;
+          }
+        }
+      });
+    }
+
+    // Apply continuous forward force to keep marbles moving
+    const targetSpeed = baseSpeedRef.current * effectiveMultiplier;
+    const currentForwardSpeed = -currentVel.z; // Negative Z is forward
+    
+    if (currentForwardSpeed < targetSpeed) {
+      // Apply forward force to maintain speed
+      const forceNeeded = (targetSpeed - currentForwardSpeed) * 10; // Adjust multiplier for responsiveness
+      rigidBodyRef.current.applyImpulse(new THREE.Vector3(0, 0, -forceNeeded * delta), true);
+    }
+
+    // Update position callback
+    if (onPositionUpdate) {
       const now = state.clock.elapsedTime;
       // Update position at ~20fps to avoid too many callbacks
       if (now - lastUpdateTime.current > 0.05) {
         lastUpdateTime.current = now;
-        const pos = rigidBodyRef.current.translation();
         onPositionUpdate(new THREE.Vector3(pos.x, pos.y, pos.z));
       }
     }
@@ -114,8 +165,8 @@ function Marble({
   );
 }
 
-// Track Component - Simple straight track with physics
-function Track() {
+// Track Component - Straight track with obstacles
+function Track({ obstacles }: { obstacles?: Array<{ z: number; type: string }> }) {
   const trackRef = useRef<THREE.Group>(null);
   const trackLength = 50;
   const trackWidth = 2;
@@ -156,6 +207,30 @@ function Track() {
         </mesh>
       </RigidBody>
       
+      {/* Obstacles - bumps, ramps, etc. */}
+      {obstacles?.map((obstacle, i) => {
+        if (obstacle.type === 'bump') {
+          return (
+            <RigidBody key={`obstacle-${i}`} type="fixed" position={[0, 0.15, obstacle.z]}>
+              <mesh>
+                <boxGeometry args={[trackWidth * 0.8, 0.1, 0.3]} />
+                <meshStandardMaterial color="#ff6b6b" roughness={0.5} />
+              </mesh>
+            </RigidBody>
+          );
+        } else if (obstacle.type === 'ramp') {
+          return (
+            <RigidBody key={`obstacle-${i}`} type="fixed" position={[0, 0.1, obstacle.z]} rotation={[0, 0, Math.PI / 12]}>
+              <mesh>
+                <boxGeometry args={[trackWidth * 0.9, 0.1, 0.5]} />
+                <meshStandardMaterial color="#4ecdc4" roughness={0.3} />
+              </mesh>
+            </RigidBody>
+          );
+        }
+        return null;
+      })}
+      
       {/* Finish line */}
       <mesh position={[0, 0.05, -trackLength]} rotation={[-Math.PI / 2, 0, 0]}>
         <boxGeometry args={[trackWidth, 0.3, 0.1]} />
@@ -194,24 +269,96 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
   const [marblePositions, setMarblePositions] = useState<Map<number, THREE.Vector3>>(new Map());
   const [leadingMarble, setLeadingMarble] = useState<THREE.Vector3>(new THREE.Vector3(0, 0.2, 0));
   const positionUpdates = useRef<Map<number, THREE.Vector3>>(new Map());
-  const [initialVelocities, setInitialVelocities] = useState<Map<number, [number, number, number]>>(new Map());
   const winnerFoundRef = useRef(false);
+  const speedMultipliersRef = useRef<Map<number, number>>(new Map());
+  const eventTimersRef = useRef<Map<number, { type: string; endTime: number }>>(new Map());
 
-  // Generate initial velocities based on VRF seed
+  // Generate initial velocities based on VRF seed - use useMemo for synchronous calculation
+  const initialVelocities = useMemo(() => {
+    if (!raceStartTime || !vrfSeed) {
+      return new Map<number, [number, number, number]>();
+    }
+    
+    const velocities = new Map<number, [number, number, number]>();
+    players.forEach((player, i) => {
+      if (player.joined) {
+        // Use VRF seed to determine initial velocity (deterministic but varied)
+        const seedOffset = i * 8;
+        const playerSeed = parseInt(vrfSeed.slice(seedOffset, seedOffset + 8) || '1', 16);
+        const speed = 0.5 + ((playerSeed % 1000) / 1000) * 0.5; // 0.5 to 1.0
+        velocities.set(player.id, [0, 0, -speed]); // Negative Z is forward
+        speedMultipliersRef.current.set(player.id, 1.0);
+      }
+    });
+    return velocities;
+  }, [raceStartTime, vrfSeed, players]);
+
+  // Generate obstacles based on VRF seed
+  const obstacles = useMemo(() => {
+    if (!vrfSeed) return [];
+    const obs: Array<{ z: number; type: string }> = [];
+    // Generate obstacles at various positions along the track
+    for (let i = 0; i < 8; i++) {
+      const seedOffset = (i + 20) * 4; // Use different part of seed
+      const obstacleSeed = parseInt(vrfSeed.slice(seedOffset, seedOffset + 4) || '1', 16);
+      const zPos = -5 - (i * 5); // Spread obstacles along track
+      const typeSeed = obstacleSeed % 3;
+      let type = 'bump';
+      if (typeSeed === 1) type = 'ramp';
+      else if (typeSeed === 2) type = 'slow';
+      obs.push({ z: zPos, type });
+    }
+    return obs;
+  }, [vrfSeed]);
+
+  // Generate dynamic events (speed bursts, slowdowns) during race
   useEffect(() => {
-    if (raceStartTime && vrfSeed) {
-      const velocities = new Map<number, [number, number, number]>();
-      players.forEach((player, i) => {
-        if (player.joined) {
-          // Use VRF seed to determine initial velocity (deterministic but varied)
-          const seedOffset = i * 8;
-          const playerSeed = parseInt(vrfSeed.slice(seedOffset, seedOffset + 8) || '1', 16);
-          const speed = 0.5 + ((playerSeed % 1000) / 1000) * 0.5; // 0.5 to 1.0
-          velocities.set(player.id, [0, 0, -speed]); // Negative Z is forward
+    if (!raceStartTime || !vrfSeed) return;
+
+    const eventInterval = setInterval(() => {
+      const now = Date.now();
+      const elapsed = (now - raceStartTime) / 1000; // seconds elapsed
+      
+      // Clear expired events
+      eventTimersRef.current.forEach((event, playerId) => {
+        if (now > event.endTime) {
+          eventTimersRef.current.delete(playerId);
+          speedMultipliersRef.current.set(playerId, 1.0);
         }
       });
-      setInitialVelocities(velocities);
-    }
+
+      // Generate new events based on VRF seed + time
+      players.forEach((player, i) => {
+        if (!player.joined) return;
+        if (eventTimersRef.current.has(player.id)) return; // Already has active event
+
+        const seedOffset = (i * 12 + Math.floor(elapsed * 2)) % (vrfSeed.length - 8);
+        const eventSeed = parseInt(vrfSeed.slice(seedOffset, seedOffset + 8) || '1', 16);
+        const shouldTrigger = (eventSeed % 100) < 3; // 3% chance per check
+
+        if (shouldTrigger) {
+          const eventTypeSeed = eventSeed % 3;
+          let type = 'boost';
+          let multiplier = 1.5;
+          let duration = 1000; // 1 second
+
+          if (eventTypeSeed === 1) {
+            type = 'slow';
+            multiplier = 0.5;
+            duration = 1500;
+          } else if (eventTypeSeed === 2) {
+            type = 'bump';
+            multiplier = 0.8;
+            duration = 800;
+          }
+
+          eventTimersRef.current.set(player.id, { type, endTime: now + duration });
+          speedMultipliersRef.current.set(player.id, multiplier);
+        }
+      });
+    }, 500); // Check every 500ms
+
+    return () => clearInterval(eventInterval);
   }, [raceStartTime, vrfSeed, players]);
 
   // Handle position updates from marbles
@@ -303,7 +450,7 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
           </RigidBody>
 
           {/* Track */}
-          <Track />
+          <Track obstacles={obstacles} />
 
           {/* Marbles */}
           {players.map((player, i) => {
@@ -311,6 +458,7 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
             const pos = marblePositions.get(player.id) || new THREE.Vector3((i - 2) * 0.3, 0.2, 0);
             const isLeading = Math.abs(leadingMarble.z - pos.z) < 0.1 && pos.z < 0;
             const velocity = initialVelocities.get(player.id) || [0, 0, -0.7];
+            const speedMultiplier = speedMultipliersRef.current.get(player.id) || 1.0;
             
             return (
               <Marble
@@ -322,6 +470,8 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
                 onPositionUpdate={handlePositionUpdate(player.id)}
                 initialVelocity={velocity}
                 raceStartTime={raceStartTime}
+                speedMultiplier={speedMultiplier}
+                obstacles={obstacles}
               />
             );
           })}
