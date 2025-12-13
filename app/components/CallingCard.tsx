@@ -165,34 +165,68 @@ export default function CallingCard({ player, theme: propTheme, stats: propStats
 
   return (
     <div 
-      className={`relative w-full ${compact ? 'h-20' : 'h-32'} rounded-2xl overflow-hidden group cursor-pointer transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl`}
+      className={`relative w-full ${compact ? 'h-20' : 'h-32'} rounded-lg overflow-hidden group cursor-pointer transform transition-all duration-300 hover:scale-[1.01] hover:shadow-xl border border-neutral-800/50`}
       onClick={handleClick}
+      style={{
+        background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%)',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 12px rgba(0,0,0,0.5)'
+      }}
     >
-      {/* Background gradient */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-90`} />
+      {/* Black Ops style dark background with subtle theme accent */}
+      <div className={`absolute inset-0 bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900`} />
       
-      {/* Pattern overlay */}
-      {getThemePattern(theme)}
+      {/* Theme accent bar on left */}
+      <div 
+        className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${gradient} opacity-60`}
+      />
       
-      {/* Scan lines effect */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(255,255,255,0.03)_50%)] bg-[length:100%_4px]" />
+      {/* Tactical grid pattern overlay */}
+      <div className="absolute inset-0 opacity-5">
+        <div 
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
+            `,
+            backgroundSize: '20px 20px'
+          }}
+        />
       </div>
       
-      {/* Corner accents */}
-      <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-white/40" />
-      <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-white/40" />
-      <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-white/40" />
-      <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-white/40" />
+      {/* Scan lines effect - more subtle */}
+      <div className="absolute inset-0 opacity-[0.03]">
+        <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(255,255,255,0.1)_50%)] bg-[length:100%_2px]" />
+      </div>
+      
+      {/* Corner brackets - Black Ops style */}
+      <div className="absolute top-0 left-0 w-6 h-6">
+        <div className="absolute top-0 left-0 w-4 h-0.5 bg-white/30" />
+        <div className="absolute top-0 left-0 w-0.5 h-4 bg-white/30" />
+      </div>
+      <div className="absolute top-0 right-0 w-6 h-6">
+        <div className="absolute top-0 right-0 w-4 h-0.5 bg-white/30" />
+        <div className="absolute top-0 right-0 w-0.5 h-4 bg-white/30" />
+      </div>
+      <div className="absolute bottom-0 left-0 w-6 h-6">
+        <div className="absolute bottom-0 left-0 w-4 h-0.5 bg-white/30" />
+        <div className="absolute bottom-0 left-0 w-0.5 h-4 bg-white/30" />
+      </div>
+      <div className="absolute bottom-0 right-0 w-6 h-6">
+        <div className="absolute bottom-0 right-0 w-4 h-0.5 bg-white/30" />
+        <div className="absolute bottom-0 right-0 w-0.5 h-4 bg-white/30" />
+      </div>
       
       {/* Content */}
-      <div className={`relative h-full flex items-center gap-3 ${compact ? 'p-3' : 'p-4'}`}>
-        {/* Profile picture / Avatar */}
+      <div className={`relative h-full flex items-center gap-3 ${compact ? 'p-3' : 'p-4'} z-10`}>
+        {/* Profile picture / Avatar - Black Ops style */}
         <div className="relative flex-shrink-0">
           <div 
-            className={`${compact ? 'w-12 h-12' : 'w-16 h-16'} rounded-lg overflow-hidden border-2 border-white/50 shadow-lg`}
+            className={`${compact ? 'w-12 h-12' : 'w-16 h-16'} rounded overflow-hidden border-2 shadow-xl`}
             style={{ 
               backgroundColor: player.color,
+              borderColor: 'rgba(255,255,255,0.2)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)'
             }}
           >
             {player.pfpUrl ? (
@@ -201,18 +235,31 @@ export default function CallingCard({ player, theme: propTheme, stats: propStats
                 alt={player.handle}
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  e.currentTarget.style.display = 'none';
+                  // Fallback to color background if image fails
+                  const target = e.currentTarget;
+                  target.style.display = 'none';
+                  if (target.parentElement) {
+                    target.parentElement.style.backgroundColor = player.color;
+                  }
                 }}
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-white font-bold text-xl">
+              <div 
+                className="w-full h-full flex items-center justify-center text-white font-bold"
+                style={{ fontSize: compact ? '16px' : '20px' }}
+              >
                 {player.handle.charAt(0).toUpperCase()}
               </div>
             )}
           </div>
-          {/* You badge */}
+          {/* You badge - Black Ops style */}
           {player.isYou && (
-            <div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white z-10">
+            <div 
+              className="absolute -top-1 -right-1 w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center shadow-lg border border-white/50 z-20"
+              style={{
+                boxShadow: '0 2px 6px rgba(37,99,235,0.6)'
+              }}
+            >
               <span className="text-white text-[7px] font-bold">YOU</span>
             </div>
           )}
@@ -221,11 +268,24 @@ export default function CallingCard({ player, theme: propTheme, stats: propStats
         {/* Player info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
-            <h3 className={`text-white font-bold ${compact ? 'text-sm' : 'text-lg'} leading-tight truncate drop-shadow-lg`}>
+            <h3 
+              className={`text-white font-bold ${compact ? 'text-sm' : 'text-base'} leading-tight truncate`}
+              style={{
+                textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)',
+                letterSpacing: '0.5px'
+              }}
+            >
               {player.handle}
             </h3>
             {player.joined && !compact && (
-              <span className="px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded text-[10px] font-bold text-white uppercase tracking-wider">
+              <span 
+                className="px-2 py-0.5 rounded text-[10px] font-bold text-white uppercase tracking-wider border"
+                style={{
+                  backgroundColor: `${player.color}40`,
+                  borderColor: `${player.color}80`,
+                  textShadow: '0 1px 2px rgba(0,0,0,0.8)'
+                }}
+              >
                 {player.colorName}
               </span>
             )}
@@ -235,12 +295,12 @@ export default function CallingCard({ player, theme: propTheme, stats: propStats
           {!compact && (
             <div className="flex items-center gap-3 mt-2">
               <div className="flex items-center gap-1">
-                <span className="text-white/80 text-xs font-medium">{stats.totalCasts}</span>
-                <span className="text-white/60 text-[10px] uppercase tracking-wide">casts</span>
+                <span className="text-white/70 text-xs font-medium">{stats.totalCasts}</span>
+                <span className="text-white/50 text-[10px] uppercase tracking-wider font-semibold">CASTS</span>
               </div>
-              <div className="w-px h-4 bg-white/30" />
+              <div className="w-px h-4 bg-white/20" />
               <div className="flex items-center gap-1">
-                <span className="text-white/80 text-xs font-semibold uppercase">{stats.topTopic}</span>
+                <span className="text-white/70 text-xs font-semibold uppercase tracking-wide">{stats.topTopic}</span>
               </div>
             </div>
           )}
@@ -248,27 +308,48 @@ export default function CallingCard({ player, theme: propTheme, stats: propStats
         
         {/* Actions */}
         <div className="flex-shrink-0 flex items-center gap-2">
-          {/* Taunt button */}
+          {/* Taunt button - Black Ops style */}
           {showTaunt && !player.isYou && player.joined && (
             <button
               onClick={handleTaunt}
-              className="px-3 py-1.5 bg-red-500/80 hover:bg-red-600 backdrop-blur-sm rounded-lg text-white text-[10px] font-bold uppercase tracking-wider transition-all hover:scale-110 active:scale-95 shadow-lg border border-white/30"
+              className="px-2.5 py-1 bg-red-600/90 hover:bg-red-700 rounded text-white text-[9px] font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 border border-red-500/50"
+              style={{
+                textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.4)'
+              }}
               title="Send a taunt"
             >
-              💥 Taunt
+              💥
             </button>
           )}
           
-          {/* Rank badge */}
-          <div className={`${compact ? 'w-10 h-10' : 'w-12 h-12'} rounded-lg bg-black/30 backdrop-blur-sm border border-white/30 flex items-center justify-center`}>
-            <span className={`text-white font-bold ${compact ? 'text-sm' : 'text-lg'}`}>#{player.id}</span>
+          {/* Rank badge - Black Ops style */}
+          <div 
+            className={`${compact ? 'w-10 h-10' : 'w-12 h-12'} rounded border flex items-center justify-center`}
+            style={{
+              backgroundColor: 'rgba(0,0,0,0.4)',
+              borderColor: 'rgba(255,255,255,0.2)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.5)'
+            }}
+          >
+            <span 
+              className={`text-white font-bold ${compact ? 'text-sm' : 'text-base'}`}
+              style={{
+                textShadow: '0 1px 3px rgba(0,0,0,0.8)'
+              }}
+            >
+              #{player.id}
+            </span>
           </div>
         </div>
       </div>
       
-      {/* Glow effect on hover */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        <div className={`absolute inset-0 bg-gradient-to-br ${gradient} blur-xl -z-10`} />
+      {/* Subtle hover glow */}
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300 pointer-events-none">
+        <div 
+          className={`absolute inset-0 bg-gradient-to-br ${gradient}`}
+          style={{ filter: 'blur(20px)' }}
+        />
       </div>
     </div>
   );

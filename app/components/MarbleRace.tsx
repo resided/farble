@@ -17,6 +17,7 @@ interface Player {
   joined: boolean;
   isYou?: boolean;
   pfpUrl?: string;
+  fid?: number; // Farcaster ID for fetching profile pictures
 }
 
 const MarbleRace = () => {
@@ -58,7 +59,10 @@ const MarbleRace = () => {
       joined: true, 
       isYou: true,
       pfpUrl: user?.pfpUrl,
+      fid: user?.fid, // Store FID for profile fetching
     },
+    // Note: In a real multiplayer app, these would have FIDs from other users joining
+    // For now, we'll fetch by username as fallback
     { id: 2, name: 'dwr', handle: '@dwr', color: '#8338EC', colorName: 'Purple', joined: true },
     { id: 3, name: 'vitalik', handle: '@vitalik', color: '#3A86FF', colorName: 'Blue', joined: true },
     { id: 4, name: 'jessepollak', handle: '@jessepollak', color: '#06FFA5', colorName: 'Mint', joined: true },
@@ -99,13 +103,49 @@ const MarbleRace = () => {
   useEffect(() => {
     const loadProfilesAndCasts = async () => {
       const allPlayers = basePlayers.filter(p => p.joined);
-      const handles = allPlayers.map(p => p.handle);
       
-      if (handles.length === 0) return;
+      if (allPlayers.length === 0) return;
       
-      // Load profile pictures
-      console.log('Fetching profile pictures for all players:', handles);
-      const profiles = await fetchNeynarProfiles(handles);
+      // Collect FIDs from all players (preferred method)
+      const fids: number[] = [];
+      allPlayers.forEach(player => {
+        if (player.fid) {
+          fids.push(player.fid);
+        }
+      });
+      
+      // Fetch profiles by FID (preferred) or username (fallback)
+      let profiles: Record<string, string> = {};
+      
+      if (fids.length > 0) {
+        // Use FIDs to fetch profiles - this is the recommended approach
+        console.log('Fetching profile pictures by FID:', fids);
+        try {
+          const fidsParam = fids.join(',');
+          const response = await fetch(`/api/neynar/profiles?fids=${fidsParam}`);
+          if (response.ok) {
+            const data = await response.json();
+            profiles = data.profiles || {};
+            console.log('Fetched profiles by FID:', profiles);
+          }
+        } catch (error) {
+          console.error('Error fetching profiles by FID:', error);
+        }
+      }
+      
+      // Fallback to username lookup if FID lookup didn't work or for players without FIDs
+      if (Object.keys(profiles).length === 0 || fids.length < allPlayers.length) {
+        const names = allPlayers
+          .filter(p => !p.fid || !profiles[`fid:${p.fid}`]) // Only fetch for players without FID or missing profiles
+          .map(p => p.name.replace('@', ''));
+        
+        if (names.length > 0) {
+          console.log('Fetching profile pictures by username (fallback):', names);
+          const usernameProfiles = await fetchNeynarProfiles(names);
+          Object.assign(profiles, usernameProfiles);
+        }
+      }
+      
       if (Object.keys(profiles).length > 0) {
         console.log('Setting player profile pictures:', profiles);
         setPlayerPfps(profiles);
@@ -176,14 +216,31 @@ const MarbleRace = () => {
   // Merge players with profile pictures from Neynar
   const players: Player[] = useMemo(() => {
     return basePlayers.map(player => {
-      // All players get pfpUrl from Neynar fetch (using their username/FID)
-      // Fallback to Farcaster context pfpUrl for current user if Neynar doesn't have it
-      const neynarPfp = playerPfps[player.handle];
+      // Try FID first (preferred method)
+      let neynarPfp: string | undefined;
+      if (player.fid) {
+        neynarPfp = playerPfps[`fid:${player.fid}`];
+      }
+      
+      // Fallback to username lookup
+      if (!neynarPfp) {
+        const cleanName = player.name.replace('@', '');
+        const cleanHandle = player.handle.replace('@', '');
+        
+        neynarPfp = playerPfps[`@${cleanName}`] || 
+                    playerPfps[`@${cleanHandle}`] || 
+                    playerPfps[cleanName] || 
+                    playerPfps[cleanHandle];
+      }
+      
+      // Fallback to Farcaster context pfpUrl for current user
       const farcasterPfp = player.isYou ? user?.pfpUrl : undefined;
+      
+      const finalPfp = neynarPfp || farcasterPfp;
       
       return {
         ...player,
-        pfpUrl: neynarPfp || farcasterPfp || undefined,
+        pfpUrl: finalPfp || undefined,
       };
     });
   }, [basePlayers, playerPfps, user?.pfpUrl]);
@@ -377,11 +434,29 @@ const MarbleRace = () => {
         console.log('VRF Seed generated:', seed);
       }
 
-      // Update race timer
+      // Update race timer - 10 second race
       const timerInterval = setInterval(() => {
         const timeElapsed = Date.now() - (raceStartTime || 0);
         const secondsElapsed = timeElapsed / 1000;
         setRaceTime(secondsElapsed);
+        
+        // Force finish after 10 seconds if no winner yet - ensure all marbles finish
+        if (secondsElapsed >= 10 && !winnerFound) {
+          // Find the leading marble as winner
+          const leadingPlayer = players
+            .filter(p => p.joined)
+            .sort((a, b) => {
+              const posA = marblePositions[a.id - 1] || 0;
+              const posB = marblePositions[b.id - 1] || 0;
+              return posB - posA; // Higher position wins
+            })[0];
+          
+          if (leadingPlayer) {
+            setWinner(leadingPlayer);
+            setWinnerFound(true);
+            setScreen('results');
+          }
+        }
       }, 100);
 
       // Old 2D race logic - only for fallback
@@ -672,7 +747,10 @@ const MarbleRace = () => {
                 return (
                   <div key={i} className={!player.joined ? 'opacity-50' : ''}>
                     <CallingCard
-                      player={player}
+                      player={{
+                        ...player,
+                        pfpUrl: player.pfpUrl || undefined // Ensure pfpUrl is passed
+                      }}
                       theme={themeData.theme}
                       stats={themeData.stats}
                       showTaunt={false}
@@ -741,43 +819,25 @@ const MarbleRace = () => {
             />
           </div>
           
-          {/* UI Overlay */}
+          {/* Simplified UI Overlay */}
           <div className="absolute inset-0 pointer-events-none z-10">
-            {/* Top info cards */}
-            <div className="absolute top-4 left-4 right-4 flex gap-2 z-20 pointer-events-auto">
-              {/* Toggle player list button */}
-              <button
-                onClick={() => setShowPlayerList(!showPlayerList)}
-                className="px-3 py-2 bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-white/20 hover:bg-white transition-colors flex items-center gap-1.5"
-                title="View players"
-              >
-                <span className="text-lg">👥</span>
-                <span className="text-xs font-semibold text-black">{players.filter(p => p.joined).length}</span>
-              </button>
-              
-              <div className="flex-1 flex gap-2">
-              {/* Pot */}
-              <div className="bg-white/95 backdrop-blur-md rounded-xl px-3 py-2 shadow-xl border border-white/20">
-                <span className="text-xs text-neutral-400 font-medium uppercase tracking-wide block">Pot</span>
-                <span className="text-sm font-bold text-black">{pot} ETH</span>
-                {ethPriceUsd !== null && (
-                  <span className="text-xs text-neutral-500">
-                    (${(parseFloat(pot) * ethPriceUsd).toFixed(2)})
-                  </span>
-                )}
-              </div>
-              
-              {/* Timer */}
-              <div className={`bg-gradient-to-r ${raceTime > 8 ? 'from-red-500/90 to-orange-500/90' : raceTime > 6 ? 'from-yellow-500/90 to-orange-500/90' : 'from-blue-500/90 to-indigo-500/90'} backdrop-blur-md rounded-xl px-3 py-2 shadow-xl border border-white/20`}>
-                <span className="text-sm font-bold text-white">
+            {/* Top bar - simplified */}
+            <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20 pointer-events-auto">
+              {/* Timer - prominent */}
+              <div className={`px-4 py-2.5 rounded-xl ${raceTime > 8 ? 'bg-red-500' : raceTime > 5 ? 'bg-orange-500' : 'bg-blue-500'} shadow-lg`}>
+                <span className="text-lg font-bold text-white">
                   {raceTime.toFixed(1)}s
                 </span>
               </div>
               
-              {/* VRF */}
-              <div className="bg-white/95 backdrop-blur-md rounded-xl px-3 py-2 shadow-xl border border-white/20">
-                <span className="text-xs text-neutral-500 font-mono">VRF: {vrfSeed?.slice(0, 8)}...</span>
-              </div>
+              {/* Pot - simple */}
+              <div className="px-4 py-2.5 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg">
+                <span className="text-sm font-bold text-black">{pot} ETH</span>
+                {ethPriceUsd !== null && (
+                  <span className="text-xs text-neutral-500 ml-1">
+                    (${(parseFloat(pot) * ethPriceUsd).toFixed(2)})
+                  </span>
+                )}
               </div>
             </div>
             
@@ -800,7 +860,10 @@ const MarbleRace = () => {
                       return (
                         <CallingCard
                           key={player.id}
-                          player={player}
+                          player={{
+                            ...player,
+                            pfpUrl: player.pfpUrl || undefined // Ensure pfpUrl is passed
+                          }}
                           theme={themeData.theme}
                           stats={themeData.stats}
                           showTaunt={true}
@@ -839,21 +902,15 @@ const MarbleRace = () => {
               </div>
             )}
             
-            {/* Race Progress - Enhanced */}
+            {/* Simple Progress Bar */}
             {raceStartTime && (
-              <div className="absolute bottom-6 left-4 right-4 z-20 pointer-events-auto">
-                <div className="bg-white/98 backdrop-blur-xl rounded-2xl px-5 py-4 shadow-2xl border border-white/30">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs text-neutral-600 font-semibold uppercase tracking-wider">Race Progress</span>
-                    <span className="text-sm font-bold text-black">{Math.round(raceProgress * 100)}%</span>
-                  </div>
-                  <div className="w-full h-2.5 bg-neutral-100 rounded-full overflow-hidden shadow-inner">
+              <div className="absolute bottom-4 left-4 right-4 z-20 pointer-events-auto">
+                <div className="bg-white/90 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
+                  <div className="w-full h-2 bg-neutral-200 rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 rounded-full transition-all duration-200 ease-out shadow-lg"
+                      className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-100"
                       style={{ width: `${Math.min(raceProgress * 100, 100)}%` }}
-                    >
-                      <div className="h-full w-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
-                    </div>
+                    />
                   </div>
                 </div>
               </div>

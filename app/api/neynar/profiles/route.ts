@@ -42,12 +42,13 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // If usernames didn't work or we have FIDs, try FID lookup
-    if ((!response || !response.ok) && fids && fids.trim() !== '') {
+    // If usernames didn't work or we have FIDs, try FID lookup (preferred method)
+    if (fids && fids.trim() !== '') {
       response = await fetch(
-        `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fids}`,
+        `https://api.neynar.com/v2/farcaster/user?fids=${fids}`,
         {
           headers: {
+            'accept': 'application/json',
             'api_key': apiKey,
           },
         }
@@ -55,7 +56,8 @@ export async function GET(request: NextRequest) {
 
       if (response.ok) {
         const data = await response.json();
-        users = data.result?.users || [];
+        // The response structure is { users: [...] } according to Neynar docs
+        users = data.users || data.result?.users || [];
         console.log(`Fetched ${users.length} users from Neynar by FID`);
       }
     }
@@ -69,13 +71,21 @@ export async function GET(request: NextRequest) {
     
     const profiles: Record<string, string> = {};
     users.forEach((user: any) => {
-      if (user.username && user.pfp_url) {
-        profiles[`@${user.username}`] = user.pfp_url;
-        console.log(`Profile for @${user.username}: ${user.pfp_url}`);
+      // Primary mapping by FID (preferred)
+      if (user.fid) {
+        const pfpUrl = user.pfp?.url || user.pfp_url;
+        if (pfpUrl) {
+          profiles[`fid:${user.fid}`] = pfpUrl;
+          console.log(`Profile for FID ${user.fid}: ${pfpUrl}`);
+        }
       }
-      // Also map by FID if available
-      if (user.fid && user.pfp_url) {
-        profiles[`fid:${user.fid}`] = user.pfp_url;
+      // Also map by username for backward compatibility
+      if (user.username) {
+        const pfpUrl = user.pfp?.url || user.pfp_url;
+        if (pfpUrl) {
+          profiles[`@${user.username}`] = pfpUrl;
+          profiles[user.username] = pfpUrl;
+        }
       }
     });
 

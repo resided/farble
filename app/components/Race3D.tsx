@@ -34,8 +34,7 @@ function Marble({
   onPositionUpdate,
   initialVelocity,
   raceStartTime,
-  speedMultiplier,
-  obstacles
+  speedMultiplier
 }: { 
   player: Player; 
   position: [number, number, number]; 
@@ -45,7 +44,6 @@ function Marble({
   initialVelocity?: [number, number, number];
   raceStartTime: number | null;
   speedMultiplier?: number;
-  obstacles?: Array<{ z: number; type: string }>;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const rigidBodyRef = useRef<any>(null);
@@ -75,69 +73,44 @@ function Marble({
     }
   }, [raceStartTime, initialVelocity]);
 
-  // Realistic physics with gravity-based movement
+  // Reliable forward movement - ensure marbles always move forward
   useFrame((state, delta) => {
     if (!rigidBodyRef.current || !raceStartTime) return;
 
     const pos = rigidBodyRef.current.translation();
     const currentVel = rigidBodyRef.current.linvel();
     
-    // Calculate effective speed multiplier (default 1.0, can be modified by events)
+    // Calculate effective speed multiplier
     let effectiveMultiplier = speedMultiplier || 1.0;
     
-    // Check for obstacles at current position (only check once per obstacle)
-    if (obstacles) {
-      obstacles.forEach(obstacle => {
-        const distanceToObstacle = Math.abs(pos.z - obstacle.z);
-        if (distanceToObstacle < 0.3 && distanceToObstacle > 0.1) {
-          if (obstacle.type === 'bump') {
-            // Bump obstacle - slight upward force (only apply once)
-            const bumpKey = `bump-${obstacle.z}-${player.id}`;
-            if (!(window as any)[bumpKey]) {
-              (window as any)[bumpKey] = true;
-              rigidBodyRef.current.applyImpulse(new THREE.Vector3(0, 0.1, 0), true);
-              setTimeout(() => delete (window as any)[bumpKey], 2000);
-            }
-          } else if (obstacle.type === 'slow') {
-            // Slow obstacle - reduce speed through friction
-            effectiveMultiplier *= 0.7;
-          } else if (obstacle.type === 'boost') {
-            // Boost obstacle - increase speed
-            effectiveMultiplier *= 1.3;
-          }
-        }
-      });
-    }
-
-    // Realistic forward movement: apply gentle forward force only if marble is too slow
-    // This simulates gravity on a sloped track without being unrealistic
+    // Target speed for 10 second race (track length 30, need to finish in 10s)
+    // Average speed needed: 30 / 10 = 3 units per second
+    // But with variation, speeds range from 2.5 to 3.5
     const targetSpeed = baseSpeedRef.current * effectiveMultiplier;
     const currentForwardSpeed = -currentVel.z; // Negative Z is forward
     
-    // Only apply force if marble is significantly slower than target (prevents weird acceleration)
-    if (currentForwardSpeed < targetSpeed * 0.8 && currentForwardSpeed < 0.3) {
-      // Gentle forward force - simulates gravity on sloped track
+    // Always apply forward force to ensure continuous movement
+    // This ensures ALL marbles cross the finish line
+    if (currentForwardSpeed < targetSpeed) {
       const speedDiff = targetSpeed - currentForwardSpeed;
-      const forceNeeded = Math.min(speedDiff * 2, 0.15); // Very gentle force, capped low
+      // Stronger force to ensure movement, but still smooth
+      const forceNeeded = Math.min(speedDiff * 5, 0.4);
       rigidBodyRef.current.applyImpulse(new THREE.Vector3(0, 0, -forceNeeded * delta), true);
     }
 
     // Keep marble on track - prevent flying off
-    if (pos.y > 0.5) {
-      // If marble is too high, gently push it down
-      rigidBodyRef.current.applyImpulse(new THREE.Vector3(0, -0.1 * delta, 0), true);
+    if (pos.y > 0.4) {
+      rigidBodyRef.current.applyImpulse(new THREE.Vector3(0, -0.2 * delta, 0), true);
     }
 
-    // Prevent marbles from going backwards
-    if (currentVel.z > 0.1) {
-      // If moving backwards, apply small forward correction
-      rigidBodyRef.current.applyImpulse(new THREE.Vector3(0, 0, -0.05 * delta), true);
+    // Prevent backwards movement - always push forward
+    if (currentVel.z > 0.05) {
+      rigidBodyRef.current.applyImpulse(new THREE.Vector3(0, 0, -0.1 * delta), true);
     }
 
-    // Update position callback (throttled for performance)
+    // Update position callback
     if (onPositionUpdate) {
       const now = state.clock.elapsedTime;
-      // Update position at ~20fps to avoid too many callbacks
       if (now - lastUpdateTime.current > 0.05) {
         lastUpdateTime.current = now;
         onPositionUpdate(new THREE.Vector3(pos.x, pos.y, pos.z));
@@ -150,13 +123,12 @@ function Marble({
       ref={rigidBodyRef}
       position={position}
       colliders="ball"
-      restitution={0.2}
-      friction={0.4}
-      linearDamping={0.08}
+      restitution={0.1}
+      friction={0.5}
+      linearDamping={0.1}
       angularDamping={0.2}
       mass={1}
       ccd={true}
-      lockRotations={false}
     >
       <mesh ref={meshRef} castShadow receiveShadow>
         <sphereGeometry args={[0.15, 32, 32]} />
@@ -187,85 +159,52 @@ function Marble({
   );
 }
 
-// Track Component - Slightly sloped track with obstacles for realistic gravity-based movement
-function Track({ obstacles }: { obstacles?: Array<{ z: number; type: string }> }) {
+// Track Component - Simple, reliable straight track
+function Track() {
   const trackRef = useRef<THREE.Group>(null);
-  const trackLength = 50;
-  const trackWidth = 2;
-  const trackSlope = -0.02; // Slight downward slope (2% grade) for realistic gravity-based movement
+  const trackLength = 30; // Shorter track for 10 second race
+  const trackWidth = 2.5;
 
   return (
     <group ref={trackRef}>
-      {/* Track base - slightly sloped track with physics for realistic movement */}
-      <RigidBody type="fixed" position={[0, 0, -trackLength / 2]} rotation={[-Math.PI / 2 + trackSlope, 0, 0]}>
+      {/* Track base - flat, reliable surface */}
+      <RigidBody type="fixed" position={[0, 0, -trackLength / 2]} rotation={[-Math.PI / 2, 0, 0]}>
         <mesh receiveShadow>
-          <boxGeometry args={[trackWidth, trackLength, 0.1]} />
-          <meshStandardMaterial color="#2a2a2a" roughness={0.8} metalness={0.2} />
+          <boxGeometry args={[trackWidth, trackLength, 0.2]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.9} metalness={0.1} />
         </mesh>
       </RigidBody>
       
-      {/* Track borders - visual */}
-      <mesh position={[0, 0.05, -trackLength / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <boxGeometry args={[trackWidth + 0.2, trackLength, 0.05]} />
-        <meshStandardMaterial color="#ffffff" roughness={0.5} />
+      {/* Track borders - visual only */}
+      <mesh position={[0, 0.1, -trackLength / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <boxGeometry args={[trackWidth + 0.3, trackLength, 0.05]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.6} />
       </mesh>
       
-      {/* Center line - dashed yellow */}
-      <mesh position={[0, 0.06, -trackLength / 2]} rotation={[-Math.PI / 2, 0, 0]}>
-        <boxGeometry args={[0.1, trackLength, 0.02]} />
+      {/* Center line */}
+      <mesh position={[0, 0.11, -trackLength / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+        <boxGeometry args={[0.15, trackLength, 0.02]} />
         <meshStandardMaterial color="#fbbf24" roughness={0.3} />
       </mesh>
 
-      {/* Track walls as colliders - higher walls to prevent flying off */}
-      <RigidBody type="fixed" position={[trackWidth / 2 + 0.15, 0.3, -trackLength / 2]} rotation={[0, 0, 0]}>
+      {/* Track walls as colliders - prevent flying off */}
+      <RigidBody type="fixed" position={[trackWidth / 2 + 0.2, 0.4, -trackLength / 2]}>
         <mesh>
-          <boxGeometry args={[0.3, 0.8, trackLength]} />
+          <boxGeometry args={[0.4, 1.0, trackLength]} />
           <meshStandardMaterial color="#888888" visible={false} />
         </mesh>
       </RigidBody>
-      <RigidBody type="fixed" position={[-trackWidth / 2 - 0.15, 0.3, -trackLength / 2]} rotation={[0, 0, 0]}>
+      <RigidBody type="fixed" position={[-trackWidth / 2 - 0.2, 0.4, -trackLength / 2]}>
         <mesh>
-          <boxGeometry args={[0.3, 0.8, trackLength]} />
-          <meshStandardMaterial color="#888888" visible={false} />
-        </mesh>
-      </RigidBody>
-      
-      {/* Invisible ceiling to prevent marbles from flying too high */}
-      <RigidBody type="fixed" position={[0, 1.0, -trackLength / 2]}>
-        <mesh>
-          <boxGeometry args={[trackWidth + 1, 0.1, trackLength]} />
+          <boxGeometry args={[0.4, 1.0, trackLength]} />
           <meshStandardMaterial color="#888888" visible={false} />
         </mesh>
       </RigidBody>
       
-      {/* Obstacles - bumps, ramps, etc. */}
-      {obstacles?.map((obstacle, i) => {
-        if (obstacle.type === 'bump') {
-          return (
-            <RigidBody key={`obstacle-${i}`} type="fixed" position={[0, 0.15, obstacle.z]}>
-              <mesh>
-                <boxGeometry args={[trackWidth * 0.8, 0.1, 0.3]} />
-                <meshStandardMaterial color="#ff6b6b" roughness={0.5} />
-              </mesh>
-            </RigidBody>
-          );
-        } else if (obstacle.type === 'ramp') {
-          return (
-            <RigidBody key={`obstacle-${i}`} type="fixed" position={[0, 0.1, obstacle.z]} rotation={[0, 0, Math.PI / 12]}>
-              <mesh>
-                <boxGeometry args={[trackWidth * 0.9, 0.1, 0.5]} />
-                <meshStandardMaterial color="#4ecdc4" roughness={0.3} />
-              </mesh>
-            </RigidBody>
-          );
-        }
-        return null;
-      })}
-      
-      {/* Finish line */}
-      <mesh position={[0, 0.05, -trackLength]} rotation={[-Math.PI / 2, 0, 0]}>
-        <boxGeometry args={[trackWidth, 0.3, 0.1]} />
-        <meshStandardMaterial color="#000000" />
+      {/* Finish line - visible marker */}
+      <mesh position={[0, 0.1, -trackLength + 0.5]} rotation={[-Math.PI / 2, 0, 0]}>
+        <boxGeometry args={[trackWidth, 0.5, 0.1]} />
+        <meshStandardMaterial color="#00ff00" emissive="#00ff00" emissiveIntensity={0.5} />
       </mesh>
     </group>
   );
@@ -313,11 +252,11 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
       const velocities = new Map<number, [number, number, number]>();
       players.forEach((player, i) => {
         if (player.joined) {
-          // Use VRF seed to determine initial velocity (deterministic but varied)
-          // Lower initial speeds for more realistic physics
+          // Use VRF seed to determine initial velocity
+          // For 10 second race: track length 30, need speeds 2.5-3.5 units/sec
           const seedOffset = i * 8;
           const playerSeed = parseInt(vrfSeed.slice(seedOffset, seedOffset + 8) || '1', 16);
-          const speed = 0.3 + ((playerSeed % 1000) / 1000) * 0.3; // 0.3 to 0.6 - more realistic
+          const speed = 2.5 + ((playerSeed % 1000) / 1000) * 1.0; // 2.5 to 3.5 for 10s race
           velocities.set(player.id, [0, 0, -speed]); // Negative Z is forward
           speedMultipliersRef.current.set(player.id, 1.0);
         }
@@ -325,73 +264,9 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
     return velocities;
   }, [raceStartTime, vrfSeed, players]);
 
-  // Generate obstacles based on VRF seed
-  const obstacles = useMemo(() => {
-    if (!vrfSeed) return [];
-    const obs: Array<{ z: number; type: string }> = [];
-    // Generate obstacles at various positions along the track
-    for (let i = 0; i < 8; i++) {
-      const seedOffset = (i + 20) * 4; // Use different part of seed
-      const obstacleSeed = parseInt(vrfSeed.slice(seedOffset, seedOffset + 4) || '1', 16);
-      const zPos = -5 - (i * 5); // Spread obstacles along track
-      const typeSeed = obstacleSeed % 3;
-      let type = 'bump';
-      if (typeSeed === 1) type = 'ramp';
-      else if (typeSeed === 2) type = 'slow';
-      obs.push({ z: zPos, type });
-    }
-    return obs;
-  }, [vrfSeed]);
+  // No obstacles - simple track for reliability
 
-  // Generate dynamic events (speed bursts, slowdowns) during race
-  useEffect(() => {
-    if (!raceStartTime || !vrfSeed) return;
-
-    const eventInterval = setInterval(() => {
-      const now = Date.now();
-      const elapsed = (now - raceStartTime) / 1000; // seconds elapsed
-      
-      // Clear expired events
-      eventTimersRef.current.forEach((event, playerId) => {
-        if (now > event.endTime) {
-          eventTimersRef.current.delete(playerId);
-          speedMultipliersRef.current.set(playerId, 1.0);
-        }
-      });
-
-      // Generate new events based on VRF seed + time
-      players.forEach((player, i) => {
-        if (!player.joined) return;
-        if (eventTimersRef.current.has(player.id)) return; // Already has active event
-
-        const seedOffset = (i * 12 + Math.floor(elapsed * 2)) % (vrfSeed.length - 8);
-        const eventSeed = parseInt(vrfSeed.slice(seedOffset, seedOffset + 8) || '1', 16);
-        const shouldTrigger = (eventSeed % 100) < 3; // 3% chance per check
-
-        if (shouldTrigger) {
-          const eventTypeSeed = eventSeed % 3;
-          let type = 'boost';
-          let multiplier = 1.5;
-          let duration = 1000; // 1 second
-
-          if (eventTypeSeed === 1) {
-            type = 'slow';
-            multiplier = 0.5;
-            duration = 1500;
-          } else if (eventTypeSeed === 2) {
-            type = 'bump';
-            multiplier = 0.8;
-            duration = 800;
-          }
-
-          eventTimersRef.current.set(player.id, { type, endTime: now + duration });
-          speedMultipliersRef.current.set(player.id, multiplier);
-        }
-      });
-    }, 500); // Check every 500ms
-
-    return () => clearInterval(eventInterval);
-  }, [raceStartTime, vrfSeed, players]);
+  // Simplified - no dynamic events for reliability
 
   // Handle position updates from marbles
   const handlePositionUpdate = (playerId: number) => (pos: THREE.Vector3) => {
@@ -412,24 +287,48 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
     setMarblePositions(positions);
     setLeadingMarble(leadingPos);
 
-    // Calculate and report progress (0 to 1)
+    // Calculate and report progress (0 to 1) - track length is 30
     if (positions.size > 0 && onProgressUpdate) {
       const maxZ = Math.max(...Array.from(positions.values()).map(p => Math.abs(p.z)));
-      const progress = Math.min(maxZ / 50, 1); // Track length is 50
+      const progress = Math.min(maxZ / 30, 1); // Track length is 30
       onProgressUpdate(progress);
     }
 
-    // Check for winner (marble past finish line)
-    if (!winnerFoundRef.current) {
+    // Check for winner (marble past finish line at z = -29.5)
+    if (!winnerFoundRef.current && raceStartTime) {
+      const finishLineZ = -29.5; // Finish line position
+      const elapsed = (Date.now() - raceStartTime) / 1000;
+      
       positions.forEach((pos, playerId) => {
-        if (pos.z < -48) {
+        if (pos.z < finishLineZ) {
           const winner = players.find(p => p.id === playerId);
-          if (winner && raceStartTime) {
+          if (winner) {
             winnerFoundRef.current = true;
             onRaceComplete(winner);
           }
         }
       });
+      
+      // Force finish after 10 seconds - ensure race completes
+      if (elapsed >= 10 && !winnerFoundRef.current) {
+        // Find marble closest to finish line
+        let closestZ = Infinity;
+        let winnerId: number | null = null;
+        positions.forEach((pos, id) => {
+          if (pos.z < closestZ) {
+            closestZ = pos.z;
+            winnerId = id;
+          }
+        });
+        
+        if (winnerId !== null) {
+          const winner = players.find(p => p.id === winnerId);
+          if (winner) {
+            winnerFoundRef.current = true;
+            onRaceComplete(winner);
+          }
+        }
+      }
     }
   };
 
@@ -440,13 +339,14 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
       const positions = new Map<number, THREE.Vector3>();
       players.forEach((player, i) => {
         if (player.joined) {
-          const pos = new THREE.Vector3((i - 2) * 0.3, 0.2, 0);
+          // Start marbles in a line, slightly above track
+          const pos = new THREE.Vector3((i - 2) * 0.35, 0.25, 0);
           positions.set(player.id, pos);
           positionUpdates.current.set(player.id, pos);
         }
       });
       setMarblePositions(positions);
-      setLeadingMarble(new THREE.Vector3(0, 0.2, 0));
+      setLeadingMarble(new THREE.Vector3(0, 0.25, 0));
     }
   }, [raceStartTime, players]);
 
@@ -482,7 +382,7 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
           </RigidBody>
 
           {/* Track */}
-          <Track obstacles={obstacles} />
+          <Track />
 
           {/* Marbles */}
           {players.map((player, i) => {
@@ -503,7 +403,6 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
                 initialVelocity={velocity}
                 raceStartTime={raceStartTime}
                 speedMultiplier={speedMultiplier}
-                obstacles={obstacles}
               />
             );
           })}
