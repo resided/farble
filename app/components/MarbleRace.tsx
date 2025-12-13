@@ -238,29 +238,70 @@ const MarbleRace = () => {
     }
   }, [screen]);
 
-  // Update camera to follow leading racer with smooth tracking
+  // Update camera to follow leading racer with smooth, cinematic tracking
   useEffect(() => {
     if (screen === 'racing' && marblePositions.length > 0 && raceStartTime && pathLength > 0) {
-      const leadingPosition = Math.max(...marblePositions);
-      const progress = Math.min(leadingPosition / TRACK_LENGTH, 1);
+      let animationFrameId: number;
       
-      // Calculate leading racer's position along the track
-      const distanceAlongPath = progress * pathLength;
-      
-      if (trackPathRef.current) {
-        const point = trackPathRef.current.getPointAtLength(distanceAlongPath);
+      const updateCamera = () => {
+        const leadingPosition = Math.max(...marblePositions);
+        const progress = Math.min(leadingPosition / TRACK_LENGTH, 1);
         
-        // Camera follows leading racer vertically, centered in viewport
-        setCameraOffset(prev => {
-          const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+        // Calculate leading racer's position along the track
+        const distanceAlongPath = progress * pathLength;
+        
+        if (trackPathRef.current) {
+          const point = trackPathRef.current.getPointAtLength(distanceAlongPath);
           
-          // Center the racer vertically in viewport
-          const targetY = Math.max(0, point.y - viewportHeight / 2);
+          // Look ahead slightly for more natural camera movement (anticipate movement)
+          const lookAheadDistance = Math.min(150, pathLength * 0.08); // 8% ahead or 150px max
+          const lookAheadProgress = Math.min(progress + (lookAheadDistance / pathLength), 1);
+          const lookAheadPoint = trackPathRef.current.getPointAtLength(lookAheadProgress * pathLength);
           
-          // Smooth interpolation for camera movement
-          return prev + (targetY - prev) * 0.12;
-        });
-      }
+          // Use weighted average - more weight on look-ahead for smoother following
+          const targetPoint = {
+            x: point.x,
+            y: point.y * 0.3 + lookAheadPoint.y * 0.7 // 70% look-ahead, 30% current
+          };
+          
+          // Camera follows leading racer vertically, centered in viewport
+          setCameraOffset(prev => {
+            const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+            
+            // Center the racer vertically in viewport with offset for better framing
+            const targetY = Math.max(0, targetPoint.y - viewportHeight / 2 - 150); // Offset down for better view
+            
+            // Very smooth, slow interpolation for cinematic feel (0.03 = very smooth and slow)
+            const smoothingFactor = 0.03;
+            
+            // Add easing - slower when far from target, faster when close
+            const distance = Math.abs(targetY - prev);
+            let easedFactor = smoothingFactor;
+            
+            if (distance > 300) {
+              easedFactor = smoothingFactor * 0.5; // Very slow when far
+            } else if (distance > 100) {
+              easedFactor = smoothingFactor * 0.7; // Medium speed
+            } else {
+              easedFactor = smoothingFactor * 1.2; // Slightly faster when close
+            }
+            
+            return prev + (targetY - prev) * easedFactor;
+          });
+        }
+        
+        // Continue animation
+        animationFrameId = requestAnimationFrame(updateCamera);
+      };
+      
+      // Start animation loop
+      animationFrameId = requestAnimationFrame(updateCamera);
+      
+      return () => {
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+      };
     }
   }, [screen, marblePositions, raceStartTime, pathLength]);
 
@@ -693,10 +734,11 @@ const MarbleRace = () => {
           </div>
           {/* Track Container with Camera Tracking */}
           <div 
-            className="absolute inset-0 transition-transform duration-100 ease-out"
+            className="absolute inset-0"
             style={{
               transform: `translateY(${-cameraOffset}px) scale(1)`,
               willChange: 'transform',
+              transition: 'transform 0.1s ease-out', // Smooth camera movement
             }}
           >
             {/* SVG Track - Vertical with gentle curves */}
