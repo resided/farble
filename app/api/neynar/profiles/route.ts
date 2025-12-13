@@ -58,7 +58,10 @@ export async function GET(request: NextRequest) {
         const data = await response.json();
         // The response structure is { users: [...] } according to Neynar docs
         users = data.users || data.result?.users || [];
-        console.log(`Fetched ${users.length} users from Neynar by FID`);
+        console.log(`Fetched ${users.length} users from Neynar by FID:`, data);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Neynar FID API error:', response.status, errorData);
       }
     }
 

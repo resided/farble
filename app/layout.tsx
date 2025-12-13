@@ -40,7 +40,7 @@ export const metadata: Metadata = {
       version: "1",
       imageUrl: "https://zarble.vercel.app/logo.png",
       button: {
-        title: "🎲 Play",
+        title: "⚪ Play",
         action: {
           type: "launch_miniapp",
           url: "https://zarble.vercel.app",
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
       version: "1",
       imageUrl: "https://zarble.vercel.app/logo.png",
       button: {
-        title: "🎲 Play",
+        title: "⚪ Play",
         action: {
           type: "launch_frame",
           url: "https://zarble.vercel.app",

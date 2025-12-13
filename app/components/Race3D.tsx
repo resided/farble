@@ -6,6 +6,141 @@ import { Physics, RigidBody, useRapier } from '@react-three/rapier';
 import { OrbitControls, PerspectiveCamera, Environment, ContactShadows, Text } from '@react-three/drei';
 import * as THREE from 'three';
 
+// Simple spectator character - cartoony and fun
+function Spectator({ position, color }: { position: [number, number, number]; color: string }) {
+  return (
+    <group position={position}>
+      {/* Head - simple sphere */}
+      <mesh position={[0, 0.3, 0]} castShadow>
+        <sphereGeometry args={[0.15, 16, 16]} />
+        <meshStandardMaterial color={color} />
+      </mesh>
+      {/* Body - cylinder */}
+      <mesh position={[0, 0.1, 0]} castShadow>
+        <cylinderGeometry args={[0.12, 0.12, 0.2, 8]} />
+        <meshStandardMaterial color={color} />
+      </mesh>
+      {/* Arms - waving */}
+      <mesh position={[-0.15, 0.15, 0]} rotation={[0, 0, Math.PI / 4]} castShadow>
+        <boxGeometry args={[0.05, 0.15, 0.05]} />
+        <meshStandardMaterial color={color} />
+      </mesh>
+      <mesh position={[0.15, 0.15, 0]} rotation={[0, 0, -Math.PI / 4]} castShadow>
+        <boxGeometry args={[0.05, 0.15, 0.05]} />
+        <meshStandardMaterial color={color} />
+      </mesh>
+    </group>
+  );
+}
+
+// Spectator stand
+function SpectatorStand({ position, side }: { position: [number, number, number]; side: 'left' | 'right' }) {
+  const colors = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181', '#AA96DA', '#FCBAD3', '#FFD93D'];
+  const spectatorPositions: Array<[number, number, number]> = [];
+  
+  // Generate spectator positions along the stand
+  for (let i = 0; i < 20; i++) {
+    const z = -25 + (i * 2.5); // Spread along track length
+    const x = side === 'left' ? -1.8 : 1.8; // Position on left or right side
+    spectatorPositions.push([x, 0.5, z]);
+  }
+  
+  return (
+    <group position={position}>
+      {/* Stand structure */}
+      <mesh position={[0, 0.2, -25]} receiveShadow>
+        <boxGeometry args={[0.5, 0.4, 50]} />
+        <meshStandardMaterial color="#8B4513" />
+      </mesh>
+      {/* Spectators */}
+      {spectatorPositions.map((pos, i) => (
+        <Spectator 
+          key={i} 
+          position={[pos[0], pos[1], pos[2]]} 
+          color={colors[i % colors.length]} 
+        />
+      ))}
+    </group>
+  );
+}
+
+// Fun cartoony tree
+function CartoonTree({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      {/* Trunk */}
+      <mesh position={[0, 0.5, 0]} castShadow>
+        <cylinderGeometry args={[0.2, 0.2, 1, 8]} />
+        <meshStandardMaterial color="#8B4513" />
+      </mesh>
+      {/* Leaves - multiple spheres for cartoony look */}
+      <mesh position={[0, 1.2, 0]} castShadow>
+        <sphereGeometry args={[0.6, 16, 16]} />
+        <meshStandardMaterial color="#4CAF50" />
+      </mesh>
+      <mesh position={[-0.3, 1.3, 0]} castShadow>
+        <sphereGeometry args={[0.4, 16, 16]} />
+        <meshStandardMaterial color="#66BB6A" />
+      </mesh>
+      <mesh position={[0.3, 1.3, 0]} castShadow>
+        <sphereGeometry args={[0.4, 16, 16]} />
+        <meshStandardMaterial color="#66BB6A" />
+      </mesh>
+    </group>
+  );
+}
+
+// Fun cartoony building
+function CartoonBuilding({ position, color }: { position: [number, number, number]; color: string }) {
+  return (
+    <group position={position}>
+      {/* Main building */}
+      <mesh position={[0, 1, 0]} castShadow receiveShadow>
+        <boxGeometry args={[1.5, 2, 1.5]} />
+        <meshStandardMaterial color={color} />
+      </mesh>
+      {/* Roof */}
+      <mesh position={[0, 2.3, 0]} castShadow>
+        <coneGeometry args={[1.2, 0.8, 4]} />
+        <meshStandardMaterial color="#FF6B6B" />
+      </mesh>
+      {/* Windows */}
+      <mesh position={[-0.4, 1.2, 0.76]} castShadow>
+        <boxGeometry args={[0.3, 0.3, 0.1]} />
+        <meshStandardMaterial color="#FFE66D" emissive="#FFE66D" emissiveIntensity={0.5} />
+      </mesh>
+      <mesh position={[0.4, 1.2, 0.76]} castShadow>
+        <boxGeometry args={[0.3, 0.3, 0.1]} />
+        <meshStandardMaterial color="#FFE66D" emissive="#FFE66D" emissiveIntensity={0.5} />
+      </mesh>
+    </group>
+  );
+}
+
+// Fun cloud
+function CartoonCloud({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      <mesh>
+        <sphereGeometry args={[0.4, 16, 16]} />
+        <meshStandardMaterial color="#ffffff" />
+      </mesh>
+      <mesh position={[-0.3, 0, 0]}>
+        <sphereGeometry args={[0.35, 16, 16]} />
+        <meshStandardMaterial color="#ffffff" />
+      </mesh>
+      <mesh position={[0.3, 0, 0]}>
+        <sphereGeometry args={[0.35, 16, 16]} />
+        <meshStandardMaterial color="#ffffff" />
+      </mesh>
+      <mesh position={[0, 0.2, 0]}>
+        <sphereGeometry args={[0.3, 16, 16]} />
+        <meshStandardMaterial color="#ffffff" />
+      </mesh>
+    </group>
+  );
+}
+
 interface Player {
   id: number;
   name: string;
@@ -370,19 +505,92 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
           />
           <pointLight position={[-10, 10, -10]} intensity={0.5} />
           
-          {/* Environment for reflections */}
+          {/* Happy, cartoony environment */}
           <Environment preset="sunset" />
           
-          {/* Ground plane */}
+          {/* Bright, cheerful ground plane */}
           <RigidBody type="fixed">
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, -25]} receiveShadow>
               <planeGeometry args={[50, 50]} />
-              <meshStandardMaterial color="#1a1a1a" roughness={0.8} />
+              <meshStandardMaterial color="#87CEEB" roughness={0.8} /> {/* Sky blue ground */}
             </mesh>
           </RigidBody>
+          
+          {/* Grass patches around track */}
+          {[-20, -10, 0, 10, 20].map((z, i) => (
+            <mesh key={`grass-${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[-3, -0.05, z - 25]} receiveShadow>
+              <planeGeometry args={[2, 2]} />
+              <meshStandardMaterial color="#7CB342" />
+            </mesh>
+          ))}
+          {[-20, -10, 0, 10, 20].map((z, i) => (
+            <mesh key={`grass-r-${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[3, -0.05, z - 25]} receiveShadow>
+              <planeGeometry args={[2, 2]} />
+              <meshStandardMaterial color="#7CB342" />
+            </mesh>
+          ))}
 
           {/* Track */}
           <Track />
+          
+          {/* Spectator stands on both sides */}
+          <SpectatorStand position={[0, 0, 0]} side="left" />
+          <SpectatorStand position={[0, 0, 0]} side="right" />
+          
+          {/* Fun cartoony trees around the track */}
+          <CartoonTree position={[-4, 0, -20]} />
+          <CartoonTree position={[-4, 0, -10]} />
+          <CartoonTree position={[-4, 0, 0]} />
+          <CartoonTree position={[-4, 0, 10]} />
+          <CartoonTree position={[-4, 0, 20]} />
+          <CartoonTree position={[4, 0, -20]} />
+          <CartoonTree position={[4, 0, -10]} />
+          <CartoonTree position={[4, 0, 0]} />
+          <CartoonTree position={[4, 0, 10]} />
+          <CartoonTree position={[4, 0, 20]} />
+          
+          {/* Fun cartoony buildings in the background */}
+          <CartoonBuilding position={[-6, 0, -15]} color="#FFB6C1" />
+          <CartoonBuilding position={[-6, 0, -5]} color="#B19CD9" />
+          <CartoonBuilding position={[-6, 0, 5]} color="#FFD700" />
+          <CartoonBuilding position={[6, 0, -15]} color="#87CEEB" />
+          <CartoonBuilding position={[6, 0, -5]} color="#FFA07A" />
+          <CartoonBuilding position={[6, 0, 5]} color="#98D8C8" />
+          
+          {/* Happy clouds in the sky */}
+          <CartoonCloud position={[-5, 8, -20]} />
+          <CartoonCloud position={[5, 7, -15]} />
+          <CartoonCloud position={[-3, 9, -5]} />
+          <CartoonCloud position={[4, 8, 5]} />
+          <CartoonCloud position={[-6, 7, 15]} />
+          
+          {/* Decorative flags/banners */}
+          {[-25, -15, -5, 5, 15, 25].map((z, i) => (
+            <group key={`flag-${i}`} position={[-1.5, 0.8, z - 25]}>
+              <mesh>
+                <boxGeometry args={[0.05, 0.8, 0.05]} />
+                <meshStandardMaterial color="#8B4513" />
+              </mesh>
+              <mesh position={[0.15, 0.4, 0]}>
+                <boxGeometry args={[0.3, 0.2, 0.01]} />
+                <meshStandardMaterial color={['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181', '#AA96DA'][i % 6]} />
+              </mesh>
+            </group>
+          ))}
+          
+          {/* Fun decorative elements - colorful balloons */}
+          {[-20, -10, 0, 10, 20].map((z, i) => (
+            <group key={`balloon-${i}`} position={[-2.5, 3 + (i % 2) * 0.5, z - 25]}>
+              <mesh>
+                <sphereGeometry args={[0.2, 16, 16]} />
+                <meshStandardMaterial color={['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181'][i % 5]} />
+              </mesh>
+              <mesh position={[0, -0.3, 0]}>
+                <cylinderGeometry args={[0.01, 0.01, 0.3, 8]} />
+                <meshStandardMaterial color="#ffffff" />
+              </mesh>
+            </group>
+          ))}
 
           {/* Marbles */}
           {players.map((player, i) => {

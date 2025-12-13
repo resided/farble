@@ -180,24 +180,71 @@ export default function CallingCard({ player, theme: propTheme, stats: propStats
         className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${gradient} opacity-60`}
       />
       
-      {/* Tactical grid pattern overlay */}
-      <div className="absolute inset-0 opacity-5">
+      {/* Crazy chaos graphics - animated patterns */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Animated grid pattern */}
         <div 
-          className="absolute inset-0"
+          className="absolute inset-0 opacity-10"
           style={{
             backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
+              linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)
             `,
-            backgroundSize: '20px 20px'
+            backgroundSize: '15px 15px',
+            animation: 'pulse 3s ease-in-out infinite'
           }}
         />
+        
+        {/* Chaotic diagonal lines */}
+        <div className="absolute inset-0 opacity-15">
+          <div className="absolute top-0 left-0 w-full h-full animate-pulse" style={{
+            background: `repeating-linear-gradient(
+              45deg,
+              transparent,
+              transparent 10px,
+              rgba(255,0,0,0.1) 10px,
+              rgba(255,0,0,0.1) 20px
+            )`,
+            animationDuration: '2s'
+          }} />
+          <div className="absolute top-0 left-0 w-full h-full animate-pulse" style={{
+            background: `repeating-linear-gradient(
+              -45deg,
+              transparent,
+              transparent 10px,
+              rgba(0,255,255,0.1) 10px,
+              rgba(0,255,255,0.1) 20px
+            )`,
+            animationDuration: '1.5s',
+            animationDelay: '0.5s'
+          }} />
+        </div>
+        
+        {/* Explosive radial bursts */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-1/4 left-1/4 w-32 h-32 rounded-full bg-gradient-radial from-red-500/30 via-transparent to-transparent blur-xl animate-ping" style={{ animationDuration: '2s' }} />
+          <div className="absolute top-3/4 right-1/4 w-24 h-24 rounded-full bg-gradient-radial from-blue-500/30 via-transparent to-transparent blur-xl animate-ping" style={{ animationDuration: '1.5s', animationDelay: '0.5s' }} />
+          <div className="absolute bottom-1/4 left-1/2 w-20 h-20 rounded-full bg-gradient-radial from-yellow-500/30 via-transparent to-transparent blur-xl animate-ping" style={{ animationDuration: '2.5s', animationDelay: '1s' }} />
+        </div>
+        
+        {/* Scan lines effect - more intense */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(255,255,255,0.2)_50%)] bg-[length:100%_3px] animate-pulse" />
+        </div>
+        
+        {/* Glitch effect */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute top-0 left-0 w-full h-1 bg-red-500 animate-pulse" style={{ animationDuration: '0.1s' }} />
+          <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 animate-pulse" style={{ animationDuration: '0.15s', animationDelay: '0.05s' }} />
+        </div>
+        
+        {/* Chaotic corner elements */}
+        <div className="absolute top-2 left-2 w-8 h-8 border-2 border-red-500/50 rotate-45 animate-spin" style={{ animationDuration: '3s' }} />
+        <div className="absolute top-2 right-2 w-6 h-6 border-2 border-blue-500/50 rounded-full animate-pulse" />
+        <div className="absolute bottom-2 left-2 w-4 h-4 bg-yellow-500/50 rotate-45 animate-bounce" />
+        <div className="absolute bottom-2 right-2 w-10 h-10 border-2 border-green-500/50 animate-pulse" style={{ animationDuration: '1s' }} />
       </div>
       
-      {/* Scan lines effect - more subtle */}
-      <div className="absolute inset-0 opacity-[0.03]">
-        <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(255,255,255,0.1)_50%)] bg-[length:100%_2px]" />
-      </div>
       
       {/* Corner brackets - Black Ops style */}
       <div className="absolute top-0 left-0 w-6 h-6">
@@ -248,7 +295,7 @@ export default function CallingCard({ player, theme: propTheme, stats: propStats
                 className="w-full h-full flex items-center justify-center text-white font-bold"
                 style={{ fontSize: compact ? '16px' : '20px' }}
               >
-                {player.handle.charAt(0).toUpperCase()}
+                {player.name.charAt(0).toUpperCase() || player.handle.replace('@', '').charAt(0).toUpperCase() || '?'}
               </div>
             )}
           </div>

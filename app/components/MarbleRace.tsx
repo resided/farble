@@ -134,17 +134,20 @@ const MarbleRace = () => {
       }
       
       // Fallback to username lookup if FID lookup didn't work or for players without FIDs
-      if (Object.keys(profiles).length === 0 || fids.length < allPlayers.length) {
-        const names = allPlayers
-          .filter(p => !p.fid || !profiles[`fid:${p.fid}`]) // Only fetch for players without FID or missing profiles
-          .map(p => p.name.replace('@', ''));
-        
-        if (names.length > 0) {
-          console.log('Fetching profile pictures by username (fallback):', names);
-          const usernameProfiles = await fetchNeynarProfiles(names);
-          Object.assign(profiles, usernameProfiles);
-        }
+      // Always try username lookup for hardcoded players
+      const names = allPlayers
+        .filter(p => !p.fid || !profiles[`fid:${p.fid}`]) // Only fetch for players without FID or missing profiles
+        .map(p => p.name.replace('@', ''))
+        .filter(n => n && n !== 'you');
+      
+      if (names.length > 0) {
+        console.log('Fetching profile pictures by username (fallback):', names);
+        const usernameProfiles = await fetchNeynarProfiles(names);
+        console.log('Username profiles fetched:', usernameProfiles);
+        Object.assign(profiles, usernameProfiles);
       }
+      
+      console.log('Final profiles object:', profiles);
       
       if (Object.keys(profiles).length > 0) {
         console.log('Setting player profile pictures:', profiles);
@@ -222,21 +225,38 @@ const MarbleRace = () => {
         neynarPfp = playerPfps[`fid:${player.fid}`];
       }
       
-      // Fallback to username lookup
+      // Fallback to username lookup - try multiple variations
       if (!neynarPfp) {
-        const cleanName = player.name.replace('@', '');
-        const cleanHandle = player.handle.replace('@', '');
+        const cleanName = player.name.replace('@', '').toLowerCase();
+        const cleanHandle = player.handle.replace('@', '').toLowerCase();
         
+        // Try all possible key variations
         neynarPfp = playerPfps[`@${cleanName}`] || 
                     playerPfps[`@${cleanHandle}`] || 
                     playerPfps[cleanName] || 
-                    playerPfps[cleanHandle];
+                    playerPfps[cleanHandle] ||
+                    playerPfps[player.name] ||
+                    playerPfps[player.handle] ||
+                    playerPfps[`@${player.name}`] ||
+                    playerPfps[`@${player.handle}`];
       }
       
       // Fallback to Farcaster context pfpUrl for current user
       const farcasterPfp = player.isYou ? user?.pfpUrl : undefined;
       
       const finalPfp = neynarPfp || farcasterPfp;
+      
+      // Debug logging
+      if (!finalPfp && player.joined) {
+        console.log(`No PFP for player ${player.name}:`, {
+          fid: player.fid,
+          name: player.name,
+          handle: player.handle,
+          availableKeys: Object.keys(playerPfps),
+          neynarPfp,
+          farcasterPfp
+        });
+      }
       
       return {
         ...player,
@@ -691,29 +711,7 @@ const MarbleRace = () => {
           />
         </div>
         <span className="text-lg font-semibold text-black tracking-tight">zarble</span>
-        {screen === 'lobby' ? (
-          <div className="ml-auto flex items-center gap-2">
-            <button className="px-4 py-2 rounded-lg bg-neutral-100 text-black text-sm font-semibold hover:bg-neutral-200 transition-colors">
-              Copy Invite
-            </button>
-            <button 
-              className="px-4 py-2 rounded-lg bg-black text-white text-sm font-semibold hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
-              onClick={handleJoinRace}
-              disabled={isPaying || isRaceStarting || countdown !== null}
-            >
-              {isPaying ? (
-                <span className="flex items-center gap-1.5">
-                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span className="text-xs">{paymentStatus || 'Processing...'}</span>
-                </span>
-              ) : hasPaid ? (
-                'Start Race'
-              ) : (
-                `Join (${buyIn} ETH)`
-              )}
-            </button>
-          </div>
-        ) : (
+        {screen !== 'lobby' && (
           <div className="ml-auto flex items-center gap-1.5 bg-neutral-100 px-3 py-1.5 rounded-full">
             <span className="text-xs text-neutral-400 font-medium">pot</span>
             <span className="text-sm font-semibold text-black">{pot} ETH</span>
@@ -767,6 +765,24 @@ const MarbleRace = () => {
               {players.filter(p => p.joined).length} / 5 players
             </span>
           </div>
+          
+          {/* Buy In / Start Race Button */}
+          <button
+            className="w-full max-w-sm py-4 px-6 rounded-xl bg-black text-white text-sm font-semibold hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative mb-4"
+            onClick={handleJoinRace}
+            disabled={isPaying || isRaceStarting || countdown !== null}
+          >
+            {isPaying ? (
+              <span className="flex items-center justify-center gap-1.5">
+                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs">{paymentStatus || 'Processing...'}</span>
+              </span>
+            ) : hasPaid ? (
+              'Start Race'
+            ) : (
+              `Join Race (${buyIn} ETH)`
+            )}
+          </button>
           
           {paymentStatus && (
             <div className={`text-xs text-center mb-4 ${paymentStatus.includes('failed') ? 'text-red-500' : 'text-green-500'}`}>
@@ -822,22 +838,12 @@ const MarbleRace = () => {
           {/* Simplified UI Overlay */}
           <div className="absolute inset-0 pointer-events-none z-10">
             {/* Top bar - simplified */}
-            <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20 pointer-events-auto">
+            <div className="absolute top-4 left-4 right-4 flex items-center justify-center z-20 pointer-events-auto">
               {/* Timer - prominent */}
               <div className={`px-4 py-2.5 rounded-xl ${raceTime > 8 ? 'bg-red-500' : raceTime > 5 ? 'bg-orange-500' : 'bg-blue-500'} shadow-lg`}>
                 <span className="text-lg font-bold text-white">
                   {raceTime.toFixed(1)}s
                 </span>
-              </div>
-              
-              {/* Pot - simple */}
-              <div className="px-4 py-2.5 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg">
-                <span className="text-sm font-bold text-black">{pot} ETH</span>
-                {ethPriceUsd !== null && (
-                  <span className="text-xs text-neutral-500 ml-1">
-                    (${(parseFloat(pot) * ethPriceUsd).toFixed(2)})
-                  </span>
-                )}
               </div>
             </div>
             
@@ -1591,42 +1597,25 @@ const MarbleRace = () => {
                       e.stopPropagation();
                       
                       const shareText = `I won ${pot} ETH on Zarble! 🏆\n\nVRF Seed: ${vrfSeed?.slice(0, 16)}...`;
-                      const shareUrl = 'https://farcaster.xyz/miniapps/AJ789Uv0lu7g/zarble';
+                      const shareUrl = 'https://farcaster.xyz/miniapps/Yg21BHYYU20K/zarble';
                       
                       try {
-                        // Try Web Share API first (works on mobile and some browsers)
-                        if (navigator.share) {
-                          await navigator.share({
-                            title: 'Zarble Winner!',
-                            text: shareText,
-                            url: shareUrl,
-                          });
+                        // Use Farcaster SDK to open cast composer with pre-filled text and URL
+                        const castText = `${shareText}\n\n${shareUrl}`;
+                        if (sdk?.actions?.openUrl) {
+                          await sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}`);
                         } else {
-                          // Fallback: copy to clipboard
-                          const fullText = `${shareText}\n${shareUrl}`;
-                          await navigator.clipboard.writeText(fullText);
-                          // Show toast notification instead of alert
-                          const toast = document.createElement('div');
-                          toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-                          toast.textContent = 'Copied to clipboard!';
-                          document.body.appendChild(toast);
-                          setTimeout(() => toast.remove(), 2000);
+                          // Fallback: open Warpcast compose URL directly
+                          window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}`, '_blank');
                         }
                       } catch (error: any) {
-                        // User cancelled or error occurred
-                        if (error.name !== 'AbortError') {
-                          // Fallback: copy to clipboard if share fails
-                          try {
-                            const fullText = `${shareText}\n${shareUrl}`;
-                            await navigator.clipboard.writeText(fullText);
-                            const toast = document.createElement('div');
-                            toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-                            toast.textContent = 'Copied to clipboard!';
-                            document.body.appendChild(toast);
-                            setTimeout(() => toast.remove(), 2000);
-                          } catch (clipboardError) {
-                            console.error('Failed to copy:', clipboardError);
-                          }
+                        console.error('Failed to open cast composer:', error);
+                        // Fallback: open Warpcast compose URL
+                        try {
+                          const castText = `${shareText}\n\n${shareUrl}`;
+                          window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}`, '_blank');
+                        } catch (fallbackError) {
+                          console.error('Failed to open Warpcast:', fallbackError);
                         }
                       }
                     }}
@@ -1701,42 +1690,25 @@ const MarbleRace = () => {
                   e.stopPropagation();
                   
                   const shareText = `I won ${pot} ETH on Zarble! 🏆\n\nVRF Seed: ${vrfSeed?.slice(0, 16)}...`;
-                  const shareUrl = 'https://farcaster.xyz/miniapps/AJ789Uv0lu7g/zarble';
+                  const shareUrl = 'https://farcaster.xyz/miniapps/Yg21BHYYU20K/zarble';
                   
                   try {
-                    // Try Web Share API first (works on mobile and some browsers)
-                    if (navigator.share) {
-                      await navigator.share({
-                        title: 'Zarble Winner!',
-                        text: shareText,
-                        url: shareUrl,
-                      });
+                    // Use Farcaster SDK to open cast composer with pre-filled text and URL
+                    const castText = `${shareText}\n\n${shareUrl}`;
+                    if (sdk?.actions?.openUrl) {
+                      await sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}`);
                     } else {
-                      // Fallback: copy to clipboard
-                      const fullText = `${shareText}\n${shareUrl}`;
-                      await navigator.clipboard.writeText(fullText);
-                      // Show toast notification instead of alert
-                      const toast = document.createElement('div');
-                      toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-                      toast.textContent = 'Copied to clipboard!';
-                      document.body.appendChild(toast);
-                      setTimeout(() => toast.remove(), 2000);
+                      // Fallback: open Warpcast compose URL directly
+                      window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}`, '_blank');
                     }
                   } catch (error: any) {
-                    // User cancelled or error occurred
-                    if (error.name !== 'AbortError') {
-                      // Fallback: copy to clipboard if share fails
-                      try {
-                        const fullText = `${shareText}\n${shareUrl}`;
-                        await navigator.clipboard.writeText(fullText);
-                        const toast = document.createElement('div');
-                        toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-                        toast.textContent = 'Copied to clipboard!';
-                        document.body.appendChild(toast);
-                        setTimeout(() => toast.remove(), 2000);
-                      } catch (clipboardError) {
-                        console.error('Failed to copy:', clipboardError);
-                      }
+                    console.error('Failed to open cast composer:', error);
+                    // Fallback: open Warpcast compose URL
+                    try {
+                      const castText = `${shareText}\n\n${shareUrl}`;
+                      window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}`, '_blank');
+                    } catch (fallbackError) {
+                      console.error('Failed to open Warpcast:', fallbackError);
                     }
                   }
                 }}
@@ -1776,7 +1748,38 @@ const MarbleRace = () => {
             </button>
           </div>
 
-          <button className="mt-3 py-3 px-6 text-blue-500 text-sm font-semibold">
+          <button 
+            className="mt-3 py-3 px-6 text-blue-500 text-sm font-semibold hover:text-blue-600 transition-colors"
+            onClick={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              
+              const shareText = winner?.isYou 
+                ? `I won ${pot} ETH on Zarble! 🏆\n\nVRF Seed: ${vrfSeed?.slice(0, 16)}...`
+                : `${winner?.handle || 'Someone'} won ${pot} ETH on Zarble! 🏆\n\nVRF Seed: ${vrfSeed?.slice(0, 16)}...`;
+              const shareUrl = 'https://farcaster.xyz/miniapps/Yg21BHYYU20K/zarble';
+              
+              try {
+                // Use Farcaster SDK to open cast composer with pre-filled text and URL
+                const castText = `${shareText}\n\n${shareUrl}`;
+                if (sdk?.actions?.openUrl) {
+                  await sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}`);
+                } else {
+                  // Fallback: open Warpcast compose URL directly
+                  window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}`, '_blank');
+                }
+              } catch (error: any) {
+                console.error('Failed to open cast composer:', error);
+                // Fallback: open Warpcast compose URL
+                try {
+                  const castText = `${shareText}\n\n${shareUrl}`;
+                  window.open(`https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}`, '_blank');
+                } catch (fallbackError) {
+                  console.error('Failed to open Warpcast:', fallbackError);
+                }
+              }
+            }}
+          >
             Share Result
           </button>
         </main>
