@@ -12,7 +12,7 @@
     "subtitle": "onchain marbles",
     "description": "Onchain marble races, play and win",
     "screenshotUrls": [
-      "https://farble.vercel.app/logo.png"
+      "https://zarble.vercel.app/logo.png"
     ],
     "primaryCategory": "games",
     "tags": [
@@ -26,6 +26,6 @@
   "accountAssociation": {
     "header": "eyJmaWQiOjM0MjQzMywidHlwZSI6ImF1dGgiLCJrZXkiOiIweDlGYUEzZWMxNjZDMjlCOTU0MjZENWJiQjc5RDNCNDVBZDUxQ0QxYzIifQ",
     "payload": "eyJkb21haW4iOiJ6YXJibGUudmVyY2VsLmFwcCJ9",
-    "signature": "+AFZzVEFRzVqj0e8IvP6hWribTKEQWSPEd38+JINPwFuII16s7fo1pLCSpi1qh/gdIaKifZ1/0XbmRUMVU6pkxs="
+    "signature": "Bvynm3iSepPyNO0IQToMUZN82SlcM4RK5Be5UBuJR70MhDzvqI31aC4M5+fMWm3ixugeZ1gRfA7Vco1RGs8vRxw="
   }
 }
