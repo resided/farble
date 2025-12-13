@@ -48,6 +48,7 @@ const MarbleRace = () => {
   const [callingCardThemes, setCallingCardThemes] = useState<Record<number, { theme: string; stats: { totalCasts: number; topTopic: string } }>>({});
   const [tauntMessage, setTauntMessage] = useState<{ playerId: number; message: string } | null>(null);
   const [showPlayerList, setShowPlayerList] = useState(false); // Toggle player list during race
+  const [maxPlayers, setMaxPlayers] = useState(5); // Configurable lobby size
 
   const basePlayers: Player[] = useMemo(() => [
     { 
@@ -267,6 +268,9 @@ const MarbleRace = () => {
 
   const buyIn = '0.001';
   const pot = (players.filter(p => p.joined).length * parseFloat(buyIn)).toFixed(3);
+  
+  // Filter players to only show up to maxPlayers
+  const visiblePlayers = players.slice(0, maxPlayers);
   const TRACK_LENGTH = 200; // Longer track (200% instead of 100%)
 
   // Generate VRF seed for verifiable randomness
@@ -761,10 +765,10 @@ const MarbleRace = () => {
             )}
           </div>
 
-          {/* Call of Duty Style Calling Cards */}
+          {/* Xbox 360 Style Calling Cards */}
           <div className="w-full mb-6">
             <div className="flex flex-col gap-3">
-              {players.map((player, i) => {
+              {visiblePlayers.map((player, i) => {
                 const themeData = callingCardThemes[player.id] || { theme: 'veteran', stats: { totalCasts: 0, topTopic: 'Player' } };
                 return (
                   <div key={i} className={!player.joined ? 'opacity-50' : ''}>
@@ -783,11 +787,25 @@ const MarbleRace = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 mb-6">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-sm text-neutral-400 font-medium">
-              {players.filter(p => p.joined).length} / 5 players
-            </span>
+          <div className="flex items-center justify-between w-full max-w-sm mb-6">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-sm text-neutral-400 font-medium">
+                {players.filter(p => p.joined).length} / {maxPlayers} players
+              </span>
+            </div>
+            
+            {/* Lobby Size Dropdown */}
+            <select
+              value={maxPlayers}
+              onChange={(e) => setMaxPlayers(Number(e.target.value))}
+              className="px-3 py-1.5 rounded-lg bg-neutral-100 text-black text-sm font-medium border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-black/20"
+              disabled={countdown !== null}
+            >
+              {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                <option key={num} value={num}>{num} players</option>
+              ))}
+            </select>
           </div>
 
           <p className="text-xs text-neutral-300 mb-4">Race starts when lobby is full</p>

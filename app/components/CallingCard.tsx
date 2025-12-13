@@ -264,105 +264,82 @@ export default function CallingCard({ player, theme: propTheme, stats: propStats
         <div className="absolute bottom-0 right-0 w-0.5 h-4 bg-white/30" />
       </div>
       
-      {/* Content */}
-      <div className={`relative h-full flex items-center gap-3 ${compact ? 'p-3' : 'p-4'} z-10`}>
-        {/* Profile picture / Avatar - Black Ops style */}
-        <div className="relative flex-shrink-0">
-          <div 
-            className={`${compact ? 'w-12 h-12' : 'w-16 h-16'} rounded overflow-hidden border-2 shadow-xl`}
-            style={{ 
-              backgroundColor: player.color,
-              borderColor: 'rgba(255,255,255,0.2)',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)'
-            }}
-          >
-            {player.pfpUrl ? (
-              <img
-                src={player.pfpUrl}
-                alt={player.handle}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  // Fallback to color background if image fails
-                  const target = e.currentTarget;
-                  target.style.display = 'none';
-                  if (target.parentElement) {
-                    target.parentElement.style.backgroundColor = player.color;
-                  }
-                }}
-              />
-            ) : (
-              <div 
-                className="w-full h-full flex items-center justify-center text-white font-bold"
-                style={{ fontSize: compact ? '16px' : '20px' }}
-              >
-                {player.name.charAt(0).toUpperCase() || player.handle.replace('@', '').charAt(0).toUpperCase() || '?'}
-              </div>
-            )}
-          </div>
-          {/* You badge - Black Ops style */}
-          {player.isYou && (
-            <div 
-              className="absolute -top-1 -right-1 w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center shadow-lg border border-white/50 z-20"
-              style={{
-                boxShadow: '0 2px 6px rgba(37,99,235,0.6)'
-              }}
-            >
-              <span className="text-white text-[7px] font-bold">YOU</span>
-            </div>
-          )}
-        </div>
-        
-        {/* Player info */}
+      {/* Content - Xbox 360 Gamertag Style */}
+      <div className={`relative h-full flex items-center ${compact ? 'p-3' : 'p-4'} z-10`}>
+        {/* Player info - Xbox 360 style gamertag */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <h3 
-              className={`text-white font-bold ${compact ? 'text-sm' : 'text-base'} leading-tight truncate`}
-              style={{
-                textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)',
-                letterSpacing: '0.5px'
+          {/* Gamertag - Xbox 360 style with color accent */}
+          <div className="flex items-center gap-2 mb-1">
+            {/* Color accent bar on left - Xbox 360 style */}
+            <div 
+              className="w-1 h-8 rounded-full"
+              style={{ 
+                backgroundColor: player.color,
+                boxShadow: `0 0 8px ${player.color}80`
               }}
-            >
-              {player.handle}
-            </h3>
-            {player.joined && !compact && (
-              <span 
-                className="px-2 py-0.5 rounded text-[10px] font-bold text-white uppercase tracking-wider border"
+            />
+            
+            {/* Gamertag text */}
+            <div className="flex-1">
+              <h3 
+                className={`text-white font-bold ${compact ? 'text-base' : 'text-xl'} leading-tight truncate`}
                 style={{
-                  backgroundColor: `${player.color}40`,
-                  borderColor: `${player.color}80`,
-                  textShadow: '0 1px 2px rgba(0,0,0,0.8)'
+                  textShadow: '2px 2px 4px rgba(0,0,0,0.8), 0 0 12px rgba(0,0,0,0.6)',
+                  letterSpacing: '1px',
+                  fontFamily: 'Arial, sans-serif',
+                  fontWeight: 700
                 }}
               >
-                {player.colorName}
-              </span>
-            )}
+                {player.handle.replace('@', '')}
+              </h3>
+              
+              {/* Subtitle - Xbox 360 style */}
+              {player.joined && !compact && (
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span 
+                    className="text-xs font-semibold uppercase tracking-widest"
+                    style={{
+                      color: player.color,
+                      textShadow: '0 0 6px rgba(0,0,0,0.8)'
+                    }}
+                  >
+                    {player.colorName}
+                  </span>
+                  {player.isYou && (
+                    <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">
+                      YOU
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           
-          {/* Stats - only show if not compact */}
+          {/* Stats - Xbox 360 style info bar */}
           {!compact && (
-            <div className="flex items-center gap-3 mt-2">
+            <div className="flex items-center gap-3 mt-2 ml-3">
               <div className="flex items-center gap-1">
-                <span className="text-white/70 text-xs font-medium">{stats.totalCasts}</span>
-                <span className="text-white/50 text-[10px] uppercase tracking-wider font-semibold">CASTS</span>
+                <span className="text-white/80 text-xs font-semibold">{stats.totalCasts}</span>
+                <span className="text-white/50 text-[10px] uppercase tracking-wider">CASTS</span>
               </div>
-              <div className="w-px h-4 bg-white/20" />
+              <div className="w-px h-3 bg-white/20" />
               <div className="flex items-center gap-1">
-                <span className="text-white/70 text-xs font-semibold uppercase tracking-wide">{stats.topTopic}</span>
+                <span className="text-white/80 text-xs font-semibold uppercase">{stats.topTopic}</span>
               </div>
             </div>
           )}
         </div>
         
-        {/* Actions */}
+        {/* Actions - Xbox 360 style */}
         <div className="flex-shrink-0 flex items-center gap-2">
-          {/* Taunt button - Black Ops style */}
+          {/* Taunt button - Xbox 360 style */}
           {showTaunt && !player.isYou && player.joined && (
             <button
               onClick={handleTaunt}
-              className="px-2.5 py-1 bg-red-600/90 hover:bg-red-700 rounded text-white text-[9px] font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 border border-red-500/50"
+              className="px-3 py-1.5 bg-red-600/90 hover:bg-red-700 rounded text-white text-xs font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95"
               style={{
-                textShadow: '0 1px 2px rgba(0,0,0,0.8)',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.4)'
+                textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.5)'
               }}
               title="Send a taunt"
             >
@@ -370,19 +347,19 @@ export default function CallingCard({ player, theme: propTheme, stats: propStats
             </button>
           )}
           
-          {/* Rank badge - Black Ops style */}
+          {/* Rank badge - Xbox 360 style */}
           <div 
-            className={`${compact ? 'w-10 h-10' : 'w-12 h-12'} rounded border flex items-center justify-center`}
+            className={`${compact ? 'w-10 h-10' : 'w-12 h-12'} rounded-lg border-2 flex items-center justify-center`}
             style={{
-              backgroundColor: 'rgba(0,0,0,0.4)',
-              borderColor: 'rgba(255,255,255,0.2)',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.5)'
+              backgroundColor: 'rgba(0,0,0,0.6)',
+              borderColor: 'rgba(255,255,255,0.3)',
+              boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.8)'
             }}
           >
             <span 
               className={`text-white font-bold ${compact ? 'text-sm' : 'text-base'}`}
               style={{
-                textShadow: '0 1px 3px rgba(0,0,0,0.8)'
+                textShadow: '0 2px 4px rgba(0,0,0,0.9)'
               }}
             >
               #{player.id}

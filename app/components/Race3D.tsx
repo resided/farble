@@ -316,10 +316,10 @@ function Track() {
         <meshStandardMaterial color="#ffffff" roughness={0.6} />
       </mesh>
       
-      {/* Center line */}
+      {/* Center line - dashed yellow, subtle */}
       <mesh position={[0, 0.11, -trackLength / 2]} rotation={[-Math.PI / 2, 0, 0]}>
-        <boxGeometry args={[0.15, trackLength, 0.02]} />
-        <meshStandardMaterial color="#fbbf24" roughness={0.3} />
+        <boxGeometry args={[0.05, trackLength, 0.01]} />
+        <meshStandardMaterial color="#fbbf24" roughness={0.3} opacity={0.3} transparent />
       </mesh>
 
       {/* Track walls as colliders - prevent flying off */}
@@ -489,11 +489,11 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
     <div className="w-full h-full">
       <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: false }}>
         <Physics gravity={[0, -9.81, 0]} timeStep="vary">
-          {/* Lighting */}
-          <ambientLight intensity={0.5} />
+          {/* Lighting - bright and cheerful */}
+          <ambientLight intensity={0.8} />
           <directionalLight
-            position={[10, 10, 5]}
-            intensity={1}
+            position={[10, 15, 5]}
+            intensity={1.2}
             castShadow
             shadow-mapSize-width={2048}
             shadow-mapSize-height={2048}
@@ -503,32 +503,25 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
             shadow-camera-top={10}
             shadow-camera-bottom={-10}
           />
-          <pointLight position={[-10, 10, -10]} intensity={0.5} />
+          <pointLight position={[-10, 10, -10]} intensity={0.6} />
+          <hemisphereLight intensity={0.5} color="#87CEEB" groundColor="#90EE90" />
           
-          {/* Happy, cartoony environment */}
+          {/* Normal, cheerful environment */}
           <Environment preset="sunset" />
           
-          {/* Bright, cheerful ground plane */}
+          {/* Sky dome - normal blue sky (inverted sphere, camera inside) */}
+          <mesh>
+            <sphereGeometry args={[200, 32, 16]} />
+            <meshBasicMaterial color="#87CEEB" side={1} /> {/* Sky blue, inside-out */}
+          </mesh>
+          
+          {/* Bright, cheerful ground plane - green grass */}
           <RigidBody type="fixed">
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, -25]} receiveShadow>
               <planeGeometry args={[50, 50]} />
-              <meshStandardMaterial color="#87CEEB" roughness={0.8} /> {/* Sky blue ground */}
+              <meshStandardMaterial color="#90EE90" roughness={0.8} /> {/* Green grass ground */}
             </mesh>
           </RigidBody>
-          
-          {/* Grass patches around track */}
-          {[-20, -10, 0, 10, 20].map((z, i) => (
-            <mesh key={`grass-${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[-3, -0.05, z - 25]} receiveShadow>
-              <planeGeometry args={[2, 2]} />
-              <meshStandardMaterial color="#7CB342" />
-            </mesh>
-          ))}
-          {[-20, -10, 0, 10, 20].map((z, i) => (
-            <mesh key={`grass-r-${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[3, -0.05, z - 25]} receiveShadow>
-              <planeGeometry args={[2, 2]} />
-              <meshStandardMaterial color="#7CB342" />
-            </mesh>
-          ))}
 
           {/* Track */}
           <Track />
@@ -557,30 +550,42 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
           <CartoonBuilding position={[6, 0, -5]} color="#FFA07A" />
           <CartoonBuilding position={[6, 0, 5]} color="#98D8C8" />
           
-          {/* Happy clouds in the sky */}
-          <CartoonCloud position={[-5, 8, -20]} />
-          <CartoonCloud position={[5, 7, -15]} />
-          <CartoonCloud position={[-3, 9, -5]} />
-          <CartoonCloud position={[4, 8, 5]} />
-          <CartoonCloud position={[-6, 7, 15]} />
+          {/* Happy clouds in the sky - positioned at normal height */}
+          <CartoonCloud position={[-5, 5, -20]} />
+          <CartoonCloud position={[5, 4, -15]} />
+          <CartoonCloud position={[-3, 6, -5]} />
+          <CartoonCloud position={[4, 5, 5]} />
+          <CartoonCloud position={[-6, 4, 15]} />
           
-          {/* Decorative flags/banners */}
+          {/* Decorative flags/banners - moved to sides, no brown pole */}
           {[-25, -15, -5, 5, 15, 25].map((z, i) => (
-            <group key={`flag-${i}`} position={[-1.5, 0.8, z - 25]}>
+            <group key={`flag-${i}`} position={[-1.8, 0.8, z - 25]}>
               <mesh>
-                <boxGeometry args={[0.05, 0.8, 0.05]} />
-                <meshStandardMaterial color="#8B4513" />
+                <boxGeometry args={[0.02, 0.6, 0.02]} />
+                <meshStandardMaterial color="#ffffff" />
               </mesh>
-              <mesh position={[0.15, 0.4, 0]}>
-                <boxGeometry args={[0.3, 0.2, 0.01]} />
+              <mesh position={[0.12, 0.3, 0]}>
+                <boxGeometry args={[0.25, 0.15, 0.01]} />
                 <meshStandardMaterial color={['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181', '#AA96DA'][i % 6]} />
               </mesh>
             </group>
           ))}
+          {[-25, -15, -5, 5, 15, 25].map((z, i) => (
+            <group key={`flag-r-${i}`} position={[1.8, 0.8, z - 25]}>
+              <mesh>
+                <boxGeometry args={[0.02, 0.6, 0.02]} />
+                <meshStandardMaterial color="#ffffff" />
+              </mesh>
+              <mesh position={[-0.12, 0.3, 0]}>
+                <boxGeometry args={[0.25, 0.15, 0.01]} />
+                <meshStandardMaterial color={['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181', '#AA96DA'][(i + 3) % 6]} />
+              </mesh>
+            </group>
+          ))}
           
-          {/* Fun decorative elements - colorful balloons */}
+          {/* Fun decorative elements - colorful balloons - positioned at normal height */}
           {[-20, -10, 0, 10, 20].map((z, i) => (
-            <group key={`balloon-${i}`} position={[-2.5, 3 + (i % 2) * 0.5, z - 25]}>
+            <group key={`balloon-${i}`} position={[-2.5, 3.5 + (i % 2) * 0.3, z - 25]}>
               <mesh>
                 <sphereGeometry args={[0.2, 16, 16]} />
                 <meshStandardMaterial color={['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181'][i % 5]} />
