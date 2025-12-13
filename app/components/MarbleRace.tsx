@@ -727,7 +727,31 @@ const MarbleRace = () => {
       {/* Lobby Screen */}
       {screen === 'lobby' && !countdown && (
         <main className="flex-1 px-6 flex flex-col items-center">
-          <div className="bg-white rounded-2xl px-8 py-5 flex flex-col items-center shadow-sm mb-8 mt-4">
+          {/* Buy In / Start Race Button - At the top */}
+          <button
+            className="w-full max-w-sm py-4 px-6 rounded-xl bg-black text-white text-sm font-semibold hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative mb-4 mt-4"
+            onClick={handleJoinRace}
+            disabled={isPaying || isRaceStarting || countdown !== null}
+          >
+            {isPaying ? (
+              <span className="flex items-center justify-center gap-1.5">
+                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs">{paymentStatus || 'Processing...'}</span>
+              </span>
+            ) : hasPaid ? (
+              'Start Race'
+            ) : (
+              `Join Race (${buyIn} ETH)`
+            )}
+          </button>
+          
+          {paymentStatus && (
+            <div className={`text-xs text-center mb-4 ${paymentStatus.includes('failed') ? 'text-red-500' : 'text-green-500'}`}>
+              {paymentStatus}
+            </div>
+          )}
+
+          <div className="bg-white rounded-2xl px-8 py-5 flex flex-col items-center shadow-sm mb-8">
             <span className="text-xs text-neutral-400 font-medium uppercase tracking-wide">buy-in</span>
             <span className="text-3xl font-bold text-black tracking-tight">{buyIn} ETH</span>
             {ethPriceUsd && (
@@ -765,30 +789,6 @@ const MarbleRace = () => {
               {players.filter(p => p.joined).length} / 5 players
             </span>
           </div>
-          
-          {/* Buy In / Start Race Button */}
-          <button
-            className="w-full max-w-sm py-4 px-6 rounded-xl bg-black text-white text-sm font-semibold hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative mb-4"
-            onClick={handleJoinRace}
-            disabled={isPaying || isRaceStarting || countdown !== null}
-          >
-            {isPaying ? (
-              <span className="flex items-center justify-center gap-1.5">
-                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs">{paymentStatus || 'Processing...'}</span>
-              </span>
-            ) : hasPaid ? (
-              'Start Race'
-            ) : (
-              `Join Race (${buyIn} ETH)`
-            )}
-          </button>
-          
-          {paymentStatus && (
-            <div className={`text-xs text-center mb-4 ${paymentStatus.includes('failed') ? 'text-red-500' : 'text-green-500'}`}>
-              {paymentStatus}
-            </div>
-          )}
 
           <p className="text-xs text-neutral-300 mb-4">Race starts when lobby is full</p>
           
