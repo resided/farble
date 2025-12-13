@@ -75,7 +75,7 @@ function Marble({
     }
   }, [raceStartTime, initialVelocity]);
 
-  // Continuous forward force and dynamic events
+  // Realistic physics with gravity-based movement
   useFrame((state, delta) => {
     if (!rigidBodyRef.current || !raceStartTime) return;
 
@@ -85,36 +85,56 @@ function Marble({
     // Calculate effective speed multiplier (default 1.0, can be modified by events)
     let effectiveMultiplier = speedMultiplier || 1.0;
     
-    // Check for obstacles at current position
+    // Check for obstacles at current position (only check once per obstacle)
     if (obstacles) {
       obstacles.forEach(obstacle => {
         const distanceToObstacle = Math.abs(pos.z - obstacle.z);
-        if (distanceToObstacle < 0.5) {
+        if (distanceToObstacle < 0.3 && distanceToObstacle > 0.1) {
           if (obstacle.type === 'bump') {
-            // Bump obstacle - slight upward force
-            rigidBodyRef.current.applyImpulse(new THREE.Vector3(0, 0.2, 0), true);
+            // Bump obstacle - slight upward force (only apply once)
+            const bumpKey = `bump-${obstacle.z}-${player.id}`;
+            if (!(window as any)[bumpKey]) {
+              (window as any)[bumpKey] = true;
+              rigidBodyRef.current.applyImpulse(new THREE.Vector3(0, 0.1, 0), true);
+              setTimeout(() => delete (window as any)[bumpKey], 2000);
+            }
           } else if (obstacle.type === 'slow') {
-            // Slow obstacle - reduce speed
-            effectiveMultiplier *= 0.5;
+            // Slow obstacle - reduce speed through friction
+            effectiveMultiplier *= 0.7;
           } else if (obstacle.type === 'boost') {
             // Boost obstacle - increase speed
-            effectiveMultiplier *= 1.5;
+            effectiveMultiplier *= 1.3;
           }
         }
       });
     }
 
-    // Apply continuous forward force to keep marbles moving
+    // Realistic forward movement: apply gentle forward force only if marble is too slow
+    // This simulates gravity on a sloped track without being unrealistic
     const targetSpeed = baseSpeedRef.current * effectiveMultiplier;
     const currentForwardSpeed = -currentVel.z; // Negative Z is forward
     
-    if (currentForwardSpeed < targetSpeed) {
-      // Apply forward force to maintain speed
-      const forceNeeded = (targetSpeed - currentForwardSpeed) * 10; // Adjust multiplier for responsiveness
+    // Only apply force if marble is significantly slower than target (prevents weird acceleration)
+    if (currentForwardSpeed < targetSpeed * 0.8 && currentForwardSpeed < 0.3) {
+      // Gentle forward force - simulates gravity on sloped track
+      const speedDiff = targetSpeed - currentForwardSpeed;
+      const forceNeeded = Math.min(speedDiff * 2, 0.15); // Very gentle force, capped low
       rigidBodyRef.current.applyImpulse(new THREE.Vector3(0, 0, -forceNeeded * delta), true);
     }
 
-    // Update position callback
+    // Keep marble on track - prevent flying off
+    if (pos.y > 0.5) {
+      // If marble is too high, gently push it down
+      rigidBodyRef.current.applyImpulse(new THREE.Vector3(0, -0.1 * delta, 0), true);
+    }
+
+    // Prevent marbles from going backwards
+    if (currentVel.z > 0.1) {
+      // If moving backwards, apply small forward correction
+      rigidBodyRef.current.applyImpulse(new THREE.Vector3(0, 0, -0.05 * delta), true);
+    }
+
+    // Update position callback (throttled for performance)
     if (onPositionUpdate) {
       const now = state.clock.elapsedTime;
       // Update position at ~20fps to avoid too many callbacks
@@ -130,11 +150,13 @@ function Marble({
       ref={rigidBodyRef}
       position={position}
       colliders="ball"
-      restitution={0.5}
-      friction={0.2}
-      linearDamping={0.1}
-      angularDamping={0.15}
+      restitution={0.2}
+      friction={0.4}
+      linearDamping={0.08}
+      angularDamping={0.2}
       mass={1}
+      ccd={true}
+      lockRotations={false}
     >
       <mesh ref={meshRef} castShadow receiveShadow>
         <sphereGeometry args={[0.15, 32, 32]} />
@@ -165,16 +187,17 @@ function Marble({
   );
 }
 
-// Track Component - Straight track with obstacles
+// Track Component - Slightly sloped track with obstacles for realistic gravity-based movement
 function Track({ obstacles }: { obstacles?: Array<{ z: number; type: string }> }) {
   const trackRef = useRef<THREE.Group>(null);
   const trackLength = 50;
   const trackWidth = 2;
+  const trackSlope = -0.02; // Slight downward slope (2% grade) for realistic gravity-based movement
 
   return (
     <group ref={trackRef}>
-      {/* Track base - straight track with physics */}
-      <RigidBody type="fixed" position={[0, 0, -trackLength / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* Track base - slightly sloped track with physics for realistic movement */}
+      <RigidBody type="fixed" position={[0, 0, -trackLength / 2]} rotation={[-Math.PI / 2 + trackSlope, 0, 0]}>
         <mesh receiveShadow>
           <boxGeometry args={[trackWidth, trackLength, 0.1]} />
           <meshStandardMaterial color="#2a2a2a" roughness={0.8} metalness={0.2} />
@@ -193,16 +216,24 @@ function Track({ obstacles }: { obstacles?: Array<{ z: number; type: string }> }
         <meshStandardMaterial color="#fbbf24" roughness={0.3} />
       </mesh>
 
-      {/* Track walls as colliders */}
-      <RigidBody type="fixed" position={[trackWidth / 2 + 0.15, 0.3, -trackLength / 2]}>
+      {/* Track walls as colliders - higher walls to prevent flying off */}
+      <RigidBody type="fixed" position={[trackWidth / 2 + 0.15, 0.3, -trackLength / 2]} rotation={[0, 0, 0]}>
         <mesh>
-          <boxGeometry args={[0.3, 0.6, trackLength]} />
+          <boxGeometry args={[0.3, 0.8, trackLength]} />
           <meshStandardMaterial color="#888888" visible={false} />
         </mesh>
       </RigidBody>
-      <RigidBody type="fixed" position={[-trackWidth / 2 - 0.15, 0.3, -trackLength / 2]}>
+      <RigidBody type="fixed" position={[-trackWidth / 2 - 0.15, 0.3, -trackLength / 2]} rotation={[0, 0, 0]}>
         <mesh>
-          <boxGeometry args={[0.3, 0.6, trackLength]} />
+          <boxGeometry args={[0.3, 0.8, trackLength]} />
+          <meshStandardMaterial color="#888888" visible={false} />
+        </mesh>
+      </RigidBody>
+      
+      {/* Invisible ceiling to prevent marbles from flying too high */}
+      <RigidBody type="fixed" position={[0, 1.0, -trackLength / 2]}>
+        <mesh>
+          <boxGeometry args={[trackWidth + 1, 0.1, trackLength]} />
           <meshStandardMaterial color="#888888" visible={false} />
         </mesh>
       </RigidBody>
@@ -279,17 +310,18 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
       return new Map<number, [number, number, number]>();
     }
     
-    const velocities = new Map<number, [number, number, number]>();
-    players.forEach((player, i) => {
-      if (player.joined) {
-        // Use VRF seed to determine initial velocity (deterministic but varied)
-        const seedOffset = i * 8;
-        const playerSeed = parseInt(vrfSeed.slice(seedOffset, seedOffset + 8) || '1', 16);
-        const speed = 0.5 + ((playerSeed % 1000) / 1000) * 0.5; // 0.5 to 1.0
-        velocities.set(player.id, [0, 0, -speed]); // Negative Z is forward
-        speedMultipliersRef.current.set(player.id, 1.0);
-      }
-    });
+      const velocities = new Map<number, [number, number, number]>();
+      players.forEach((player, i) => {
+        if (player.joined) {
+          // Use VRF seed to determine initial velocity (deterministic but varied)
+          // Lower initial speeds for more realistic physics
+          const seedOffset = i * 8;
+          const playerSeed = parseInt(vrfSeed.slice(seedOffset, seedOffset + 8) || '1', 16);
+          const speed = 0.3 + ((playerSeed % 1000) / 1000) * 0.3; // 0.3 to 0.6 - more realistic
+          velocities.set(player.id, [0, 0, -speed]); // Negative Z is forward
+          speedMultipliersRef.current.set(player.id, 1.0);
+        }
+      });
     return velocities;
   }, [raceStartTime, vrfSeed, players]);
 
@@ -420,8 +452,8 @@ export default function Race3D({ players, raceStartTime, onRaceComplete, vrfSeed
 
   return (
     <div className="w-full h-full">
-      <Canvas shadows>
-        <Physics gravity={[0, -9.81, 0]}>
+      <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: false }}>
+        <Physics gravity={[0, -9.81, 0]} timeStep="vary">
           {/* Lighting */}
           <ambientLight intensity={0.5} />
           <directionalLight

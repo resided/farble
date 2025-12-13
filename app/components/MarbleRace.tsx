@@ -6,6 +6,7 @@ import { useFarcaster } from '../hooks/useFarcaster';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { fetchNeynarProfiles } from '../hooks/useNeynar';
 import Race3D from './Race3D';
+import CallingCard, { analyzeCasts } from './CallingCard';
 
 interface Player {
   id: number;
@@ -42,6 +43,10 @@ const MarbleRace = () => {
   const [marbleRecovery, setMarbleRecovery] = useState<Record<number, number>>({}); // Recovery from setbacks
   const [isRaceStarting, setIsRaceStarting] = useState(false); // Prevent multiple start clicks
   const [raceProgress, setRaceProgress] = useState(0); // Progress for 3D race (0 to 1)
+  const [playerCasts, setPlayerCasts] = useState<Record<number, any[]>>({}); // Cast data for calling cards
+  const [callingCardThemes, setCallingCardThemes] = useState<Record<number, { theme: string; stats: { totalCasts: number; topTopic: string } }>>({});
+  const [tauntMessage, setTauntMessage] = useState<{ playerId: number; message: string } | null>(null);
+  const [showPlayerList, setShowPlayerList] = useState(false); // Toggle player list during race
 
   const basePlayers: Player[] = useMemo(() => [
     { 
@@ -90,16 +95,15 @@ const MarbleRace = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch profile pictures from Neynar for ALL players (including current user)
+  // Fetch profile pictures and casts for calling cards
   useEffect(() => {
-    const loadProfiles = async () => {
-      // Fetch profiles for all players who have joined, including current user
-      // This ensures we get profile pictures from Neynar using usernames/FIDs
+    const loadProfilesAndCasts = async () => {
       const allPlayers = basePlayers.filter(p => p.joined);
       const handles = allPlayers.map(p => p.handle);
       
       if (handles.length === 0) return;
       
+      // Load profile pictures
       console.log('Fetching profile pictures for all players:', handles);
       const profiles = await fetchNeynarProfiles(handles);
       if (Object.keys(profiles).length > 0) {
@@ -108,11 +112,66 @@ const MarbleRace = () => {
       } else {
         console.warn('No profile pictures loaded. Check NEYNAR_API_KEY is set.');
       }
+      
+      // Load casts for calling cards (using FIDs if available)
+      try {
+        const fids: string[] = [];
+        
+        allPlayers.forEach(player => {
+          if (player.isYou && user?.fid) {
+            fids.push(user.fid.toString());
+          }
+        });
+        
+        if (fids.length > 0) {
+          const response = await fetch(`/api/neynar/casts?fids=${fids.join(',')}`);
+          if (response.ok) {
+            const data = await response.json();
+            const castsData = data.castsByFid || {};
+            
+            // Analyze casts and set themes
+            const themes: Record<number, { theme: string; stats: { totalCasts: number; topTopic: string } }> = {};
+            
+            allPlayers.forEach(player => {
+              let fid: string | null = null;
+              if (player.isYou && user?.fid) {
+                fid = user.fid.toString();
+              }
+              
+              if (fid && castsData[fid]) {
+                const analysis = analyzeCasts(castsData[fid]);
+                themes[player.id] = analysis;
+              } else {
+                // Default theme for players without cast data
+                themes[player.id] = { theme: 'veteran', stats: { totalCasts: 0, topTopic: 'Player' } };
+              }
+            });
+            
+            setPlayerCasts(castsData);
+            setCallingCardThemes(themes);
+          }
+        } else {
+          // Set default themes if no FIDs available
+          const defaultThemes: Record<number, { theme: string; stats: { totalCasts: number; topTopic: string } }> = {};
+          allPlayers.forEach(player => {
+            defaultThemes[player.id] = { theme: 'veteran', stats: { totalCasts: 0, topTopic: 'Player' } };
+          });
+          setCallingCardThemes(defaultThemes);
+        }
+      } catch (error) {
+        console.error('Error loading casts:', error);
+        // Set default themes on error
+        const defaultThemes: Record<number, { theme: string; stats: { totalCasts: number; topTopic: string } }> = {};
+        allPlayers.forEach(player => {
+          defaultThemes[player.id] = { theme: 'veteran', stats: { totalCasts: 0, topTopic: 'Player' } };
+        });
+        setCallingCardThemes(defaultThemes);
+      }
     };
 
-    // Always load profiles when component mounts or screen changes
-    loadProfiles();
-  }, [screen, basePlayers]);
+    // Always load profiles and casts when component mounts or screen changes
+    loadProfilesAndCasts();
+  }, [screen, basePlayers, user]);
 
   // Merge players with profile pictures from Neynar
   const players: Player[] = useMemo(() => {
@@ -605,100 +664,22 @@ const MarbleRace = () => {
             )}
           </div>
 
-          {/* Vertical bullet-point style player list */}
-          <div className="w-full bg-white rounded-3xl p-4 shadow-md mb-6">
-            <div className="flex flex-col gap-2">
-              {players.map((player, i) => (
-                <div 
-                  key={i} 
-                  className={`flex items-center gap-3 p-3 rounded-xl transition-all ${player.isYou ? 'bg-blue-50 ring-2 ring-blue-500' : 'bg-neutral-50'} ${player.joined ? '' : 'opacity-40'}`}
-                >
-                  {/* Bullet point - marble - Clickable profile */}
-                  <div className="relative flex-shrink-0">
-                    {player.joined ? (
-                      <a
-                        href={`https://warpcast.com/${player.name}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block cursor-pointer hover:scale-110 transition-transform duration-200"
-                      >
-                        <div 
-                          className="w-12 h-12 rounded-full overflow-hidden relative"
-                          style={{ 
-                            backgroundColor: player.color,
-                            boxShadow: player.joined 
-                              ? '0 4px 16px rgba(0,0,0,0.2), inset 0 -4px 8px rgba(0,0,0,0.15), inset 0 4px 8px rgba(255,255,255,0.5)' 
-                              : 'none',
-                            border: player.pfpUrl ? `3px solid ${player.color}` : 'none',
-                          }}
-                        >
-                          {/* Profile picture or color fallback */}
-                          {player.pfpUrl ? (
-                            <img
-                              src={player.pfpUrl}
-                              alt={player.handle}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                // Hide the image if it fails to load, showing the color background instead
-                                e.currentTarget.style.display = 'none';
-                              }}
-                            />
-                          ) : null}
-                          
-                          {/* Marble shine effect */}
-                          <div 
-                            className="absolute inset-0 rounded-full pointer-events-none"
-                            style={{
-                              background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 60%)`,
-                            }}
-                          />
-                          {/* Marble shadow effect */}
-                          <div 
-                            className="absolute inset-0 rounded-full pointer-events-none"
-                            style={{
-                              background: `radial-gradient(circle at 70% 70%, rgba(0,0,0,0.2) 0%, transparent 60%)`,
-                            }}
-                          />
-                        </div>
-                      </a>
-                    ) : (
-                      <div 
-                        className="w-12 h-12 rounded-full overflow-hidden relative"
-                        style={{ 
-                          backgroundColor: player.color,
-                          boxShadow: 'none',
-                          border: player.pfpUrl ? `3px solid ${player.color}` : 'none',
-                        }}
-                      >
-                        {/* Marble shine effect */}
-                        <div 
-                          className="absolute inset-0 rounded-full pointer-events-none"
-                          style={{
-                            background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 60%)`,
-                          }}
-                        />
-                      </div>
-                    )}
-                    {/* You indicator - positioned outside the circle to avoid clipping */}
-                    {player.isYou && (
-                      <div className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow-md border-2 border-white z-10">
-                        <span className="text-white text-[9px] font-bold leading-none">YOU</span>
-                      </div>
-                    )}
+          {/* Call of Duty Style Calling Cards */}
+          <div className="w-full mb-6">
+            <div className="flex flex-col gap-3">
+              {players.map((player, i) => {
+                const themeData = callingCardThemes[player.id] || { theme: 'veteran', stats: { totalCasts: 0, topTopic: 'Player' } };
+                return (
+                  <div key={i} className={!player.joined ? 'opacity-50' : ''}>
+                    <CallingCard
+                      player={player}
+                      theme={themeData.theme}
+                      stats={themeData.stats}
+                      showTaunt={false}
+                    />
                   </div>
-                  {/* Username and color - horizontal layout */}
-                  <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-                    <span className={`text-sm font-bold ${player.joined ? 'text-black' : 'text-neutral-400'} truncate`}>
-                      {player.joined ? player.handle : 'waiting'}
-                    </span>
-                    {player.joined && (
-                      <span className="text-xs text-neutral-500 font-medium uppercase tracking-wide">
-                        {player.colorName}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -744,7 +725,7 @@ const MarbleRace = () => {
 
       {/* Racing Screen - 3D View */}
       {screen === 'racing' && (
-        <main className="flex-1 relative overflow-hidden bg-black">
+        <main className="flex-1 relative overflow-hidden bg-gradient-to-b from-neutral-900 via-black to-neutral-900">
           {/* 3D Race Scene */}
           <div className="absolute inset-0">
             <Race3D
@@ -763,7 +744,18 @@ const MarbleRace = () => {
           {/* UI Overlay */}
           <div className="absolute inset-0 pointer-events-none z-10">
             {/* Top info cards */}
-            <div className="absolute top-4 left-4 right-4 flex gap-2 z-20">
+            <div className="absolute top-4 left-4 right-4 flex gap-2 z-20 pointer-events-auto">
+              {/* Toggle player list button */}
+              <button
+                onClick={() => setShowPlayerList(!showPlayerList)}
+                className="px-3 py-2 bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-white/20 hover:bg-white transition-colors flex items-center gap-1.5"
+                title="View players"
+              >
+                <span className="text-lg">👥</span>
+                <span className="text-xs font-semibold text-black">{players.filter(p => p.joined).length}</span>
+              </button>
+              
+              <div className="flex-1 flex gap-2">
               {/* Pot */}
               <div className="bg-white/95 backdrop-blur-md rounded-xl px-3 py-2 shadow-xl border border-white/20">
                 <span className="text-xs text-neutral-400 font-medium uppercase tracking-wide block">Pot</span>
@@ -786,25 +778,82 @@ const MarbleRace = () => {
               <div className="bg-white/95 backdrop-blur-md rounded-xl px-3 py-2 shadow-xl border border-white/20">
                 <span className="text-xs text-neutral-500 font-mono">VRF: {vrfSeed?.slice(0, 8)}...</span>
               </div>
+              </div>
             </div>
             
-            {/* Race Progress */}
-            {raceStartTime && (
-              <div className="absolute bottom-4 left-4 right-4 z-20">
-                <div className="bg-white/95 backdrop-blur-md rounded-xl px-4 py-3 shadow-xl border border-white/20">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-neutral-600">Race Progress</span>
-                    <span className="text-xs font-bold text-neutral-800">
-                      {Math.round(raceProgress * 100)}%
-                    </span>
+            {/* Player List Overlay - During Race */}
+            {showPlayerList && screen === 'racing' && (
+              <div className="absolute top-20 left-4 right-4 z-30 pointer-events-auto max-h-[60vh] overflow-y-auto">
+                <div className="bg-white/98 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border border-white/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-black uppercase tracking-wider">Players</h3>
+                    <button
+                      onClick={() => setShowPlayerList(false)}
+                      className="w-6 h-6 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center transition-colors"
+                    >
+                      <span className="text-xs">✕</span>
+                    </button>
                   </div>
-                  <div className="w-full h-2 bg-neutral-200 rounded-full overflow-hidden">
+                  <div className="flex flex-col gap-2">
+                    {players.filter(p => p.joined).map((player) => {
+                      const themeData = callingCardThemes[player.id] || { theme: 'veteran', stats: { totalCasts: 0, topTopic: 'Player' } };
+                      return (
+                        <CallingCard
+                          key={player.id}
+                          player={player}
+                          theme={themeData.theme}
+                          stats={themeData.stats}
+                          showTaunt={true}
+                          onTaunt={(playerId) => {
+                            const taunts = [
+                              "🏃 You're too slow!",
+                              "💨 Catch me if you can!",
+                              "⚡ I'm leaving you in the dust!",
+                              "🎯 First place is mine!",
+                              "🔥 You can't keep up!",
+                              "💪 Try harder!",
+                              "🚀 See ya!",
+                              "👋 Bye bye!"
+                            ];
+                            const randomTaunt = taunts[Math.floor(Math.random() * taunts.length)];
+                            setTauntMessage({ playerId, message: randomTaunt });
+                            setTimeout(() => setTauntMessage(null), 3000);
+                          }}
+                          compact={true}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Taunt Message Display */}
+            {tauntMessage && (
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-none">
+                <div className="bg-red-500/95 backdrop-blur-md rounded-xl px-6 py-4 shadow-2xl border-2 border-white/50 animate-bounce">
+                  <p className="text-white font-bold text-lg text-center drop-shadow-lg">
+                    {tauntMessage.message}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {/* Race Progress - Enhanced */}
+            {raceStartTime && (
+              <div className="absolute bottom-6 left-4 right-4 z-20 pointer-events-auto">
+                <div className="bg-white/98 backdrop-blur-xl rounded-2xl px-5 py-4 shadow-2xl border border-white/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs text-neutral-600 font-semibold uppercase tracking-wider">Race Progress</span>
+                    <span className="text-sm font-bold text-black">{Math.round(raceProgress * 100)}%</span>
+                  </div>
+                  <div className="w-full h-2.5 bg-neutral-100 rounded-full overflow-hidden shadow-inner">
                     <div 
-                      className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-300"
-                      style={{ 
-                        width: `${Math.min(raceProgress * 100, 100)}%` 
-                      }}
-                    />
+                      className="h-full bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 rounded-full transition-all duration-200 ease-out shadow-lg"
+                      style={{ width: `${Math.min(raceProgress * 100, 100)}%` }}
+                    >
+                      <div className="h-full w-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1480,40 +1529,51 @@ const MarbleRace = () => {
                 {/* Share button - only show if current user won */}
                 {winner.isYou && (
                   <button
-                    onClick={async () => {
-                      const shareText = `I won the prize pot on Zarble! 🏆`;
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      const shareText = `I won ${pot} ETH on Zarble! 🏆\n\nVRF Seed: ${vrfSeed?.slice(0, 16)}...`;
                       const shareUrl = 'https://farcaster.xyz/miniapps/AJ789Uv0lu7g/zarble';
-                      const shareData = {
-                        title: 'Zarble Winner!',
-                        text: shareText,
-                        url: shareUrl,
-                      };
-
+                      
                       try {
                         // Try Web Share API first (works on mobile and some browsers)
                         if (navigator.share) {
-                          await navigator.share(shareData);
+                          await navigator.share({
+                            title: 'Zarble Winner!',
+                            text: shareText,
+                            url: shareUrl,
+                          });
                         } else {
                           // Fallback: copy to clipboard
-                          const fullText = `${shareText} ${shareUrl}`;
+                          const fullText = `${shareText}\n${shareUrl}`;
                           await navigator.clipboard.writeText(fullText);
-                          alert('Copied to clipboard! Share it anywhere!');
+                          // Show toast notification instead of alert
+                          const toast = document.createElement('div');
+                          toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                          toast.textContent = 'Copied to clipboard!';
+                          document.body.appendChild(toast);
+                          setTimeout(() => toast.remove(), 2000);
                         }
                       } catch (error: any) {
                         // User cancelled or error occurred
                         if (error.name !== 'AbortError') {
                           // Fallback: copy to clipboard if share fails
                           try {
-                            const fullText = `${shareText} ${shareUrl}`;
+                            const fullText = `${shareText}\n${shareUrl}`;
                             await navigator.clipboard.writeText(fullText);
-                            alert('Copied to clipboard! Share it anywhere!');
+                            const toast = document.createElement('div');
+                            toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                            toast.textContent = 'Copied to clipboard!';
+                            document.body.appendChild(toast);
+                            setTimeout(() => toast.remove(), 2000);
                           } catch (clipboardError) {
                             console.error('Failed to copy:', clipboardError);
                           }
                         }
                       }
                     }}
-                    className="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-semibold hover:from-blue-600 hover:to-purple-600 transition-all shadow-lg flex items-center justify-center gap-2"
+                    className="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-semibold hover:from-blue-600 hover:to-purple-600 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
                   >
                     <span>📤</span>
                     Share Victory
@@ -1579,40 +1639,51 @@ const MarbleRace = () => {
               
               {/* Share button on results screen */}
               <button
-                onClick={async () => {
-                  const shareText = `I won the prize pot on Zarble! 🏆`;
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  const shareText = `I won ${pot} ETH on Zarble! 🏆\n\nVRF Seed: ${vrfSeed?.slice(0, 16)}...`;
                   const shareUrl = 'https://farcaster.xyz/miniapps/AJ789Uv0lu7g/zarble';
-                  const shareData = {
-                    title: 'Farble Winner!',
-                    text: shareText,
-                    url: shareUrl,
-                  };
-
+                  
                   try {
                     // Try Web Share API first (works on mobile and some browsers)
                     if (navigator.share) {
-                      await navigator.share(shareData);
+                      await navigator.share({
+                        title: 'Zarble Winner!',
+                        text: shareText,
+                        url: shareUrl,
+                      });
                     } else {
                       // Fallback: copy to clipboard
-                      const fullText = `${shareText} ${shareUrl}`;
+                      const fullText = `${shareText}\n${shareUrl}`;
                       await navigator.clipboard.writeText(fullText);
-                      alert('Copied to clipboard! Share it anywhere!');
+                      // Show toast notification instead of alert
+                      const toast = document.createElement('div');
+                      toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                      toast.textContent = 'Copied to clipboard!';
+                      document.body.appendChild(toast);
+                      setTimeout(() => toast.remove(), 2000);
                     }
                   } catch (error: any) {
                     // User cancelled or error occurred
                     if (error.name !== 'AbortError') {
                       // Fallback: copy to clipboard if share fails
                       try {
-                        const fullText = `${shareText} ${shareUrl}`;
+                        const fullText = `${shareText}\n${shareUrl}`;
                         await navigator.clipboard.writeText(fullText);
-                        alert('Copied to clipboard! Share it anywhere!');
+                        const toast = document.createElement('div');
+                        toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                        toast.textContent = 'Copied to clipboard!';
+                        document.body.appendChild(toast);
+                        setTimeout(() => toast.remove(), 2000);
                       } catch (clipboardError) {
                         console.error('Failed to copy:', clipboardError);
                       }
                     }
                   }
                 }}
-                className="mt-4 w-full max-w-sm py-3 px-6 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-semibold hover:from-blue-600 hover:to-purple-600 transition-all shadow-lg flex items-center justify-center gap-2"
+                className="mt-4 w-full max-w-sm py-3 px-6 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-semibold hover:from-blue-600 hover:to-purple-600 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
               >
                 <span>📤</span>
                 Share Victory
