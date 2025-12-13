@@ -268,9 +268,10 @@ const MarbleRace = () => {
           setCameraOffset(prev => {
             const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
             
-          // Zoomed out view - show more of the track for better spectator experience
-          // Show about 60% of viewport height to keep more track visible
-          const targetY = Math.max(0, targetPoint.y - viewportHeight * 0.3); // Zoomed out - show more track
+          // Top-down camera - center both X and Y
+          const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 400;
+          const targetX = Math.max(0, targetPoint.x - viewportWidth / 2);
+          const targetY = Math.max(0, targetPoint.y - viewportHeight / 2);
             
             // Very smooth, slow interpolation for cinematic feel (0.03 = very smooth and slow)
             const smoothingFactor = 0.03;
@@ -287,6 +288,8 @@ const MarbleRace = () => {
               easedFactor = smoothingFactor * 1.2; // Slightly faster when close
             }
             
+            // For top-down, we need to track both X and Y, but cameraOffset is a single value
+            // Use average or just Y for now (can be enhanced later)
             return prev + (targetY - prev) * easedFactor;
           });
         }
@@ -725,56 +728,82 @@ const MarbleRace = () => {
         </main>
       )}
 
-      {/* Racing Screen - Full Page Curved Track */}
+      {/* Racing Screen - Top-Down Desert View */}
       {screen === 'racing' && (
-        <main className="flex-1 relative overflow-hidden bg-gradient-to-b from-sky-100 via-blue-50 to-emerald-50">
-          {/* Stadium atmosphere - Sky and stadium stands */}
+        <main className="flex-1 relative overflow-hidden bg-gradient-to-br from-amber-100 via-yellow-50 to-orange-50">
+          {/* Desert background with texture */}
           <div className="absolute inset-0 overflow-hidden">
-            {/* Sky gradient */}
-            <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-b from-blue-200 via-sky-100 to-transparent" />
+            {/* Sandy desert base */}
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-200/80 via-yellow-100/90 to-orange-100/80" />
             
-            {/* Stadium stands - left side */}
-            <div className="absolute left-0 top-0 w-24 h-full bg-gradient-to-r from-gray-800 via-gray-700 to-transparent opacity-30">
-              <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_8px,rgba(255,255,255,0.1)_8px,rgba(255,255,255,0.1)_10px)]" />
+            {/* Sand texture pattern */}
+            <div className="absolute inset-0 opacity-30" style={{
+              backgroundImage: `radial-gradient(circle at 20% 30%, rgba(139,69,19,0.1) 0%, transparent 50%),
+                                radial-gradient(circle at 80% 70%, rgba(160,82,45,0.1) 0%, transparent 50%),
+                                radial-gradient(circle at 50% 50%, rgba(184,134,11,0.1) 0%, transparent 50%)`,
+            }} />
+            
+            {/* Desert cacti - scattered around */}
+            {[...Array(8)].map((_, i) => {
+              const positions = [
+                { left: '10%', top: '15%' },
+                { left: '85%', top: '20%' },
+                { left: '15%', top: '60%' },
+                { left: '80%', top: '65%' },
+                { left: '5%', top: '40%' },
+                { left: '90%', top: '45%' },
+                { left: '25%', top: '85%' },
+                { left: '75%', top: '90%' },
+              ];
+              const pos = positions[i % positions.length];
+              return (
+                <div key={i} className="absolute" style={{ left: pos.left, top: pos.top, transform: 'translate(-50%, -50%)' }}>
+                  {/* Cactus body */}
+                  <div className="w-3 h-8 bg-green-700 rounded-full relative">
+                    {/* Cactus arms */}
+                    <div className="absolute -left-2 top-2 w-2 h-4 bg-green-700 rounded-full" />
+                    <div className="absolute -right-2 top-4 w-2 h-5 bg-green-700 rounded-full" />
+                    {/* Shadow */}
+                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-black/20 rounded-full blur-sm" />
+                  </div>
+                </div>
+              );
+            })}
+            
+            {/* Windmill in corner */}
+            <div className="absolute top-8 left-8 w-16 h-16">
+              {/* Windmill base */}
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3 h-12 bg-amber-800 rounded-full" />
+              {/* Windmill head */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-12 bg-amber-700 rounded-full">
+                {/* Blades */}
+                {[0, 90, 180, 270].map((rot, i) => (
+                  <div
+                    key={i}
+                    className="absolute top-1/2 left-1/2 w-1 h-6 bg-white origin-top"
+                    style={{ transform: `translate(-50%, -50%) rotate(${rot}deg)` }}
+                  />
+                ))}
+              </div>
+              {/* Shadow */}
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-12 h-2 bg-black/20 rounded-full blur-sm" />
             </div>
-            
-            {/* Stadium stands - right side */}
-            <div className="absolute right-0 top-0 w-24 h-full bg-gradient-to-l from-gray-800 via-gray-700 to-transparent opacity-30">
-              <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_8px,rgba(255,255,255,0.1)_8px,rgba(255,255,255,0.1)_10px)]" />
-            </div>
-            
-            {/* Spectator silhouettes - animated */}
-            <div className="absolute left-4 top-1/4 w-16 h-32 opacity-20">
-              <div className="absolute bottom-0 w-full h-8 bg-gray-900 rounded-t-full" />
-              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-6 h-6 bg-gray-900 rounded-full" />
-            </div>
-            <div className="absolute right-4 top-1/3 w-16 h-32 opacity-20">
-              <div className="absolute bottom-0 w-full h-8 bg-gray-900 rounded-t-full" />
-              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-6 h-6 bg-gray-900 rounded-full" />
-            </div>
-            
-            {/* Stadium lights effect */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-32 bg-gradient-to-b from-yellow-200/20 via-transparent to-transparent" />
-            
-            {/* Animated background elements */}
-            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.08),transparent_50%)]" />
-            <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_70%_80%,rgba(16,185,129,0.08),transparent_50%)]" />
           </div>
-          {/* Track Container with Camera Tracking */}
+          {/* Track Container with Camera Tracking - Top-Down View */}
           <div 
             className="absolute inset-0"
             style={{
-              transform: `translateY(${-cameraOffset}px) scale(1)`,
+              transform: `translate(${-cameraOffset}px, ${-cameraOffset}px) scale(0.6)`,
               willChange: 'transform',
-              transition: 'transform 0.1s ease-out', // Smooth camera movement
+              transition: 'transform 0.1s ease-out',
             }}
           >
-            {/* SVG Track - Vertical with gentle curves */}
+            {/* SVG Track - Top-Down S-Shaped Track */}
             <svg 
-              className="absolute top-0 left-1/2 -translate-x-1/2"
-              viewBox="0 0 400 4000"
-              preserveAspectRatio="none"
-              style={{ width: '400px', height: '4000px' }}
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+              viewBox="0 0 2000 2000"
+              preserveAspectRatio="xMidYMid meet"
+              style={{ width: '2000px', height: '2000px' }}
             >
               <defs>
                 <filter id="trackGlow">
@@ -786,131 +815,160 @@ const MarbleRace = () => {
                 </filter>
               </defs>
               
-              {/* Track path - Vertical with gentle curves for visual interest */}
+              {/* Track path - Top-Down S-Shaped Track with colorful segments */}
               <path
                 ref={trackPathRef}
-                d="M 200 0 
-                   Q 180 500 200 1000
-                   Q 220 1500 200 2000
-                   Q 180 2500 200 3000
-                   Q 220 3500 200 4000"
+                d="M 200 100 
+                   Q 400 200 600 300
+                   Q 800 400 1000 500
+                   Q 1200 600 1400 700
+                   Q 1600 800 1800 900
+                   Q 1600 1100 1400 1300
+                   Q 1200 1500 1000 1700
+                   Q 800 1800 600 1850
+                   Q 400 1900 200 1950"
                 fill="none"
                 stroke="#374151"
-                strokeWidth="88"
+                strokeWidth="120"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 id="track-path"
               />
               
-              {/* Track Base - Dark asphalt */}
+              {/* Colorful track segments */}
               <path
-                d="M 200 0 
-                   Q 180 500 200 1000
-                   Q 220 1500 200 2000
-                   Q 180 2500 200 3000
-                   Q 220 3500 200 4000"
+                d="M 200 100 Q 400 200 600 300"
                 fill="none"
-                stroke="#1f2937"
+                stroke="#3b82f6"
                 strokeWidth="100"
                 strokeLinecap="round"
-                strokeLinejoin="round"
+              />
+              <path
+                d="M 600 300 Q 800 400 1000 500"
+                fill="none"
+                stroke="#8b5cf6"
+                strokeWidth="100"
+                strokeLinecap="round"
+              />
+              <path
+                d="M 1000 500 Q 1200 600 1400 700"
+                fill="none"
+                stroke="#ec4899"
+                strokeWidth="100"
+                strokeLinecap="round"
+              />
+              <path
+                d="M 1400 700 Q 1600 800 1800 900"
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth="100"
+                strokeLinecap="round"
+              />
+              <path
+                d="M 1800 900 Q 1600 1100 1400 1300"
+                fill="none"
+                stroke="#10b981"
+                strokeWidth="100"
+                strokeLinecap="round"
+              />
+              <path
+                d="M 1400 1300 Q 1200 1500 1000 1700"
+                fill="none"
+                stroke="#06b6d4"
+                strokeWidth="100"
+                strokeLinecap="round"
+              />
+              <path
+                d="M 1000 1700 Q 800 1800 600 1850"
+                fill="none"
+                stroke="#f97316"
+                strokeWidth="100"
+                strokeLinecap="round"
+              />
+              <path
+                d="M 600 1850 Q 400 1900 200 1950"
+                fill="none"
+                stroke="#ef4444"
+                strokeWidth="100"
+                strokeLinecap="round"
               />
               
-              {/* Track Outer Border - White lines */}
+              {/* Track borders - White lines with red dashes */}
               <path
-                d="M 200 0 
-                   Q 180 500 200 1000
-                   Q 220 1500 200 2000
-                   Q 180 2500 200 3000
-                   Q 220 3500 200 4000"
+                ref={trackPathRef}
+                d="M 200 100 
+                   Q 400 200 600 300
+                   Q 800 400 1000 500
+                   Q 1200 600 1400 700
+                   Q 1600 800 1800 900
+                   Q 1600 1100 1400 1300
+                   Q 1200 1500 1000 1700
+                   Q 800 1800 600 1850
+                   Q 400 1900 200 1950"
                 fill="none"
                 stroke="#ffffff"
-                strokeWidth="76"
+                strokeWidth="130"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                opacity="0.3"
+                opacity="0.9"
               />
               
-              {/* Track Inner Border - White lines */}
+              {/* Red dashed track borders */}
               <path
-                d="M 200 0 
-                   Q 180 500 200 1000
-                   Q 220 1500 200 2000
-                   Q 180 2500 200 3000
-                   Q 220 3500 200 4000"
+                d="M 200 100 
+                   Q 400 200 600 300
+                   Q 800 400 1000 500
+                   Q 1200 600 1400 700
+                   Q 1600 800 1800 900
+                   Q 1600 1100 1400 1300
+                   Q 1200 1500 1000 1700
+                   Q 800 1800 600 1850
+                   Q 400 1900 200 1950"
                 fill="none"
-                stroke="#ffffff"
-                strokeWidth="6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity="0.5"
-              />
-              
-              {/* Center Line - Yellow dashed */}
-              <path
-                d="M 200 0 
-                   Q 180 500 200 1000
-                   Q 220 1500 200 2000
-                   Q 180 2500 200 3000
-                   Q 220 3500 200 4000"
-                fill="none"
-                stroke="#fbbf24"
-                strokeWidth="4"
-                strokeDasharray="20 20"
+                stroke="#ef4444"
+                strokeWidth="8"
+                strokeDasharray="15 10"
                 strokeLinecap="round"
                 opacity="0.8"
               />
               
-              {/* Track Texture - Subtle road markings */}
+              {/* Center line - Yellow dashed */}
               <path
-                d="M 200 0 
-                   Q 180 500 200 1000
-                   Q 220 1500 200 2000
-                   Q 180 2500 200 3000
-                   Q 220 3500 200 4000"
+                d="M 200 100 
+                   Q 400 200 600 300
+                   Q 800 400 1000 500
+                   Q 1200 600 1400 700
+                   Q 1600 800 1800 900
+                   Q 1600 1100 1400 1300
+                   Q 1200 1500 1000 1700
+                   Q 800 1800 600 1850
+                   Q 400 1900 200 1950"
                 fill="none"
-                stroke="rgba(255,255,255,0.15)"
-                strokeWidth="84"
+                stroke="#fbbf24"
+                strokeWidth="6"
+                strokeDasharray="30 20"
                 strokeLinecap="round"
-                strokeDasharray="60 120"
-                opacity="0.5"
+                opacity="0.9"
               />
               
-              {/* Obstacles along the track */}
-              {trackPathRef.current && pathLength > 0 && [...Array(6)].map((_, i) => {
-                const obstacleProgress = 0.1 + (i * 0.15);
-                if (obstacleProgress >= 1 || !trackPathRef.current) return null;
-                const distance = obstacleProgress * pathLength;
+              {/* Checkered flags at checkpoints */}
+              {trackPathRef.current && pathLength > 0 && [0.25, 0.5, 0.75].map((checkpoint, i) => {
+                if (!trackPathRef.current) return null;
+                const distance = checkpoint * pathLength;
                 const point = trackPathRef.current.getPointAtLength(distance);
+                const prevPoint = trackPathRef.current.getPointAtLength(Math.max(0, distance - 10));
+                const angle = Math.atan2(point.y - prevPoint.y, point.x - prevPoint.x) * 180 / Math.PI;
+                const perpendicularAngle = angle + 90;
                 
                 return (
-                  <g key={i} transform={`translate(${point.x}, ${point.y})`}>
-                    {/* Obstacle shadow */}
-                    <circle
-                      r="20"
-                      fill="rgba(0,0,0,0.3)"
-                      opacity="0.5"
-                      cy="3"
-                    />
-                    {/* Obstacle */}
-                    <circle
-                      r="18"
-                      fill="url(#obstacleGradient)"
-                      opacity="0.9"
-                      filter="url(#obstacleGlow)"
-                    />
-                    <circle
-                      r="14"
-                      fill="#ef4444"
-                    />
-                    <circle
-                      r="10"
-                      fill="#fca5a5"
-                    />
-                    <circle
-                      r="6"
-                      fill="#fee2e2"
-                    />
+                  <g key={`checkpoint-${i}`} transform={`translate(${point.x}, ${point.y}) rotate(${perpendicularAngle})`}>
+                    {/* Checkered flag */}
+                    <rect x="-40" y="-60" width="80" height="120" fill="url(#checkerPattern)" opacity="0.9" />
+                    <rect x="-40" y="-60" width="80" height="120" fill="url(#finishGradient)" opacity="0.3" />
+                    {/* Flag pole */}
+                    <line x1="0" y1="-60" x2="0" y2="-80" stroke="#8b4513" strokeWidth="4" />
+                    {/* Label */}
+                    <text x="0" y="70" textAnchor="middle" fill="#000" fontSize="16" fontWeight="bold" opacity="0.8">CHECK</text>
                   </g>
                 );
               })}
@@ -970,8 +1028,8 @@ const MarbleRace = () => {
               </defs>
             </svg>
             
-            {/* Marbles on Track - Positioned using SVG coordinates */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2" style={{ width: '400px', height: '4000px', pointerEvents: 'none' }}>
+            {/* Marbles on Track - Top-Down View */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: '2000px', height: '2000px', pointerEvents: 'none' }}>
               {players.map((player, i) => {
                 const position = marblePositions[i];
                 const progress = Math.min(position / TRACK_LENGTH, 1);
