@@ -803,7 +803,7 @@ const MarbleRace = () => {
               className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
               viewBox="0 0 2000 2000"
               preserveAspectRatio="xMidYMid meet"
-              style={{ width: '2000px', height: '2000px' }}
+              style={{ width: '2000px', height: '2000px', pointerEvents: 'none' }}
             >
               <defs>
                 <filter id="trackGlow">
@@ -1028,17 +1028,25 @@ const MarbleRace = () => {
               </defs>
             </svg>
             
-            {/* Marbles on Track - Top-Down View */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: '2000px', height: '2000px', pointerEvents: 'none' }}>
+            {/* Marbles on Track - Top-Down View - Aligned with SVG */}
+            <div 
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" 
+              style={{ 
+                width: '2000px', 
+                height: '2000px', 
+                pointerEvents: 'none',
+                transform: 'translate(-50%, -50%)'
+              }}
+            >
               {players.map((player, i) => {
                 const position = marblePositions[i];
                 const progress = Math.min(position / TRACK_LENGTH, 1);
                 const isLeading = position === Math.max(...marblePositions);
                 
                 // Get exact position on SVG path using getPointAtLength
-                let x = 200;
-                let y = 0;
-                let angle = 90; // Default: point down
+                let x = 200; // Track starts at x=200
+                let y = 100; // Track starts at y=100
+                let angle = 0; // Top-down view, no rotation needed initially
                 
                 if (trackPathRef.current && pathLength > 0) {
                   const distanceAlongPath = progress * pathLength;
@@ -1064,9 +1072,9 @@ const MarbleRace = () => {
                       zIndex: isLeading ? 20 : 10,
                     }}
                   >
-                    {/* Marble - Funky new design with sleek colors */}
+                    {/* Marble - Top-down view, larger for visibility */}
                     <div
-                      className="w-10 h-10 rounded-full overflow-hidden relative transition-all duration-75"
+                      className="w-16 h-16 rounded-full overflow-hidden relative transition-all duration-75"
                       style={{
                         background: player.pfpUrl 
                           ? `url(${player.pfpUrl})`
@@ -1074,8 +1082,8 @@ const MarbleRace = () => {
                         backgroundSize: player.pfpUrl ? 'cover' : 'auto',
                         backgroundPosition: 'center',
                         boxShadow: isLeading
-                          ? `0 8px 32px ${player.color}ff, 0 4px 16px rgba(0,0,0,0.8), inset 0 -3px 6px rgba(0,0,0,0.6), inset 0 3px 6px rgba(255,255,255,1)`
-                          : `0 4px 16px ${player.color}88, 0 2px 8px rgba(0,0,0,0.7), inset 0 -2px 4px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.9)`,
+                          ? `0 0 20px ${player.color}ff, 0 0 40px ${player.color}aa, 0 8px 32px rgba(0,0,0,0.9), inset 0 -3px 6px rgba(0,0,0,0.6), inset 0 3px 6px rgba(255,255,255,1)`
+                          : `0 0 12px ${player.color}cc, 0 4px 16px rgba(0,0,0,0.8), inset 0 -2px 4px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.9)`,
                         border: `2px solid ${player.color}`,
                         filter: marbleEvents[i]?.type === 'fall'
                           ? 'brightness(0.5) saturate(0.5) drop-shadow(0 0 8px rgba(255,0,0,0.8))'
