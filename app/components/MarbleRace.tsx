@@ -767,7 +767,7 @@ const MarbleRace = () => {
           >
             {/* Simple Straight Track - Side View */}
             <svg 
-              className="absolute bottom-0 left-1/2 -translate-x-1/2"
+              className="absolute top-0 left-1/2 -translate-x-1/2"
               viewBox="0 0 400 4000"
               preserveAspectRatio="none"
               style={{ width: '400px', height: '4000px' }}
@@ -841,6 +841,13 @@ const MarbleRace = () => {
                 );
               })()}
               
+              {/* Start line at the beginning */}
+              <g transform="translate(200, 0)">
+                <rect x="-150" y="-15" width="300" height="30" fill="url(#checkerPattern)" opacity="0.7" />
+                <line x1="-150" y1="0" x2="150" y2="0" stroke="#000" strokeWidth="4" opacity="0.8" />
+                <text x="0" y="-25" textAnchor="middle" fill="#000" fontSize="20" fontWeight="bold" opacity="0.9">START</text>
+              </g>
+              
               {/* Finish Line - At the end of the track */}
               {trackPathRef.current && pathLength > 0 && (() => {
                 const finishPoint = trackPathRef.current.getPointAtLength(pathLength);
@@ -898,7 +905,7 @@ const MarbleRace = () => {
             
             {/* Marbles on Track - Side View */}
             <div 
-              className="absolute bottom-0 left-1/2 -translate-x-1/2" 
+              className="absolute top-0 left-1/2 -translate-x-1/2" 
               style={{ 
                 width: '400px', 
                 height: '4000px', 
