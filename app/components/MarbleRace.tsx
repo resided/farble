@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useFarcaster } from '../hooks/useFarcaster';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { fetchNeynarProfiles } from '../hooks/useNeynar';
+import Race3D from './Race3D';
 
 interface Player {
   id: number;
@@ -40,6 +41,7 @@ const MarbleRace = () => {
   const [marbleEvents, setMarbleEvents] = useState<Record<number, { type: string; endTime: number }>>({}); // Random race events
   const [marbleRecovery, setMarbleRecovery] = useState<Record<number, number>>({}); // Recovery from setbacks
   const [isRaceStarting, setIsRaceStarting] = useState(false); // Prevent multiple start clicks
+  const [raceProgress, setRaceProgress] = useState(0); // Progress for 3D race (0 to 1)
 
   const basePlayers: Player[] = useMemo(() => [
     { 
@@ -316,10 +318,19 @@ const MarbleRace = () => {
         console.log('VRF Seed generated:', seed);
       }
 
-      const interval = setInterval(() => {
+      // Update race timer
+      const timerInterval = setInterval(() => {
         const timeElapsed = Date.now() - (raceStartTime || 0);
         const secondsElapsed = timeElapsed / 1000;
         setRaceTime(secondsElapsed);
+      }, 100);
+
+      // Old 2D race logic - only for fallback
+      if (false) {
+        const interval = setInterval(() => {
+          const timeElapsed = Date.now() - (raceStartTime || 0);
+          const secondsElapsed = timeElapsed / 1000;
+          setRaceTime(secondsElapsed);
 
         setMarblePositions(prev => {
           const seed = vrfSeed || generateVrfSeed();
@@ -472,7 +483,12 @@ const MarbleRace = () => {
         });
       }, 50); // 50ms updates = 20fps, 400 frames = 20 seconds
 
-      return () => clearInterval(interval);
+        return () => clearInterval(interval);
+      }
+      
+      return () => {
+        clearInterval(timerInterval);
+      };
     }
   }, [screen, winnerFound, vrfSeed, raceStartTime, players]);
 
@@ -726,8 +742,79 @@ const MarbleRace = () => {
         </main>
       )}
 
-      {/* Racing Screen - Behind-the-Marble View */}
+      {/* Racing Screen - 3D View */}
       {screen === 'racing' && (
+        <main className="flex-1 relative overflow-hidden bg-black">
+          {/* 3D Race Scene */}
+          <div className="absolute inset-0">
+            <Race3D
+              players={players}
+              raceStartTime={raceStartTime}
+              onRaceComplete={(winner) => {
+                setWinner(winner);
+                setWinnerFound(true);
+                setScreen('results');
+              }}
+              vrfSeed={vrfSeed}
+              onProgressUpdate={(progress) => setRaceProgress(progress)}
+            />
+          </div>
+          
+          {/* UI Overlay */}
+          <div className="absolute inset-0 pointer-events-none z-10">
+            {/* Top info cards */}
+            <div className="absolute top-4 left-4 right-4 flex gap-2 z-20">
+              {/* Pot */}
+              <div className="bg-white/95 backdrop-blur-md rounded-xl px-3 py-2 shadow-xl border border-white/20">
+                <span className="text-xs text-neutral-400 font-medium uppercase tracking-wide block">Pot</span>
+                <span className="text-sm font-bold text-black">{pot} ETH</span>
+                {ethPriceUsd !== null && (
+                  <span className="text-xs text-neutral-500">
+                    (${(parseFloat(pot) * ethPriceUsd).toFixed(2)})
+                  </span>
+                )}
+              </div>
+              
+              {/* Timer */}
+              <div className={`bg-gradient-to-r ${raceTime > 8 ? 'from-red-500/90 to-orange-500/90' : raceTime > 6 ? 'from-yellow-500/90 to-orange-500/90' : 'from-blue-500/90 to-indigo-500/90'} backdrop-blur-md rounded-xl px-3 py-2 shadow-xl border border-white/20`}>
+                <span className="text-sm font-bold text-white">
+                  {raceTime.toFixed(1)}s
+                </span>
+              </div>
+              
+              {/* VRF */}
+              <div className="bg-white/95 backdrop-blur-md rounded-xl px-3 py-2 shadow-xl border border-white/20">
+                <span className="text-xs text-neutral-500 font-mono">VRF: {vrfSeed?.slice(0, 8)}...</span>
+              </div>
+            </div>
+            
+            {/* Race Progress */}
+            {raceStartTime && (
+              <div className="absolute bottom-4 left-4 right-4 z-20">
+                <div className="bg-white/95 backdrop-blur-md rounded-xl px-4 py-3 shadow-xl border border-white/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-neutral-600">Race Progress</span>
+                    <span className="text-xs font-bold text-neutral-800">
+                      {Math.round(raceProgress * 100)}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-neutral-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-300"
+                      style={{ 
+                        width: `${Math.min(raceProgress * 100, 100)}%` 
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+      )}
+      
+      {/* Old 2D Racing Screen - Keep as fallback for now */}
+      {false && screen === 'racing' && (
         <main className="flex-1 relative overflow-hidden bg-gradient-to-b from-sky-400 via-blue-300 to-emerald-200">
           {/* Sky and horizon */}
           <div className="absolute inset-0 overflow-hidden">
@@ -828,7 +915,8 @@ const MarbleRace = () => {
               
               {/* Finish line at the end */}
               {trackPathRef.current && pathLength > 0 && (() => {
-                const finishPoint = trackPathRef.current.getPointAtLength(pathLength);
+                const path = trackPathRef.current!; // Non-null assertion after check
+                const finishPoint = path.getPointAtLength(pathLength);
                 return (
                   <g transform={`translate(${finishPoint.x}, ${finishPoint.y})`}>
                     {/* Finish line - horizontal */}
@@ -847,28 +935,6 @@ const MarbleRace = () => {
                 <line x1="-150" y1="0" x2="150" y2="0" stroke="#000" strokeWidth="4" opacity="0.8" />
                 <text x="0" y="-25" textAnchor="middle" fill="#000" fontSize="20" fontWeight="bold" opacity="0.9">START</text>
               </g>
-              
-              {/* Finish Line - At the end of the track */}
-              {trackPathRef.current && pathLength > 0 && (() => {
-                const finishPoint = trackPathRef.current.getPointAtLength(pathLength);
-                const prevPoint = trackPathRef.current.getPointAtLength(pathLength - 10);
-                const finishAngle = Math.atan2(finishPoint.y - prevPoint.y, finishPoint.x - prevPoint.x) * 180 / Math.PI;
-                const perpendicularAngle = finishAngle + 90;
-                return (
-                  <g transform={`translate(${finishPoint.x}, ${finishPoint.y}) rotate(${perpendicularAngle})`}>
-                    {/* Finish line base - perpendicular to track */}
-                    <rect x="-150" y="-15" width="300" height="30" fill="url(#checkerPattern)" opacity="1" />
-                    {/* Finish line glow */}
-                    <rect x="-150" y="-15" width="300" height="30" fill="url(#finishGradient)" opacity="0.4" />
-                    {/* Black border lines */}
-                    <line x1="-150" y1="0" x2="150" y2="0" stroke="#000" strokeWidth="6" opacity="1" />
-                    <line x1="-150" y1="-3" x2="150" y2="-3" stroke="#fff" strokeWidth="2" opacity="0.8" />
-                    <line x1="-150" y1="3" x2="150" y2="3" stroke="#fff" strokeWidth="2" opacity="0.8" />
-                    {/* Finish flag effect */}
-                    <rect x="5" y="-200" width="20" height="400" fill="url(#finishFlag)" opacity="0.8" />
-                  </g>
-                );
-              })()}
               
               {/* Enhanced Patterns and Gradients */}
               <defs>
@@ -1121,9 +1187,9 @@ const MarbleRace = () => {
               <div className="bg-white/95 backdrop-blur-md rounded-xl px-4 py-2.5 shadow-xl border border-white/20">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-black">Pot: {pot} ETH</span>
-                  {ethPriceUsd && (
+                  {ethPriceUsd !== null && (
                     <span className="text-xs text-neutral-500">
-                      ${(parseFloat(pot) * ethPriceUsd).toFixed(2)}
+                      ${(parseFloat(pot) * (ethPriceUsd as number)).toFixed(2)}
                     </span>
                   )}
                 </div>
