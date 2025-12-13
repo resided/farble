@@ -531,14 +531,14 @@ const MarbleRace = () => {
         <div className="relative w-6 h-6 flex-shrink-0">
           <Image 
             src="/logo.png" 
-            alt="FARBLE" 
+            alt="ZARBLE" 
             width={24}
             height={24}
             className="object-contain"
             priority
           />
         </div>
-        <span className="text-lg font-semibold text-black tracking-tight">farble</span>
+        <span className="text-lg font-semibold text-black tracking-tight">zarble</span>
         {screen === 'lobby' ? (
           <div className="ml-auto flex items-center gap-2">
             <button className="px-4 py-2 rounded-lg bg-neutral-100 text-black text-sm font-semibold hover:bg-neutral-200 transition-colors">
@@ -1447,10 +1447,10 @@ const MarbleRace = () => {
                 {winner.isYou && (
                   <button
                     onClick={async () => {
-                      const shareText = `I won the prize pot on Farble! 🏆`;
-                      const shareUrl = 'https://farcaster.xyz/miniapps/AJ789Uv0lu7g/farble';
+                      const shareText = `I won the prize pot on Zarble! 🏆`;
+                      const shareUrl = 'https://farcaster.xyz/miniapps/AJ789Uv0lu7g/zarble';
                       const shareData = {
-                        title: 'Farble Winner!',
+                        title: 'Zarble Winner!',
                         text: shareText,
                         url: shareUrl,
                       };
@@ -1546,8 +1546,8 @@ const MarbleRace = () => {
               {/* Share button on results screen */}
               <button
                 onClick={async () => {
-                  const shareText = `I won the prize pot on Farble! 🏆`;
-                  const shareUrl = 'https://farcaster.xyz/miniapps/AJ789Uv0lu7g/farble';
+                  const shareText = `I won the prize pot on Zarble! 🏆`;
+                  const shareUrl = 'https://farcaster.xyz/miniapps/AJ789Uv0lu7g/zarble';
                   const shareData = {
                     title: 'Farble Winner!',
                     text: shareText,

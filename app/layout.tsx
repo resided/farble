@@ -38,28 +38,28 @@ export const metadata: Metadata = {
     "base:app_id": "693c923410053b1bcb25eedc",
     "fc:miniapp": JSON.stringify({
       version: "1",
-      imageUrl: "https://farble.vercel.app/logo.png",
+      imageUrl: "https://zarble.vercel.app/logo.png",
       button: {
         title: "🎲 Play",
         action: {
           type: "launch_miniapp",
-          url: "https://farble.vercel.app",
-          name: "Farble",
-          splashImageUrl: "https://farble.vercel.app/logo.png",
+          url: "https://zarble.vercel.app",
+          name: "Zarble",
+          splashImageUrl: "https://zarble.vercel.app/logo.png",
           splashBackgroundColor: "#ffffff",
         },
       },
     }),
     "fc:frame": JSON.stringify({
       version: "1",
-      imageUrl: "https://farble.vercel.app/logo.png",
+      imageUrl: "https://zarble.vercel.app/logo.png",
       button: {
         title: "🎲 Play",
         action: {
           type: "launch_frame",
-          url: "https://farble.vercel.app",
-          name: "Farble",
-          splashImageUrl: "https://farble.vercel.app/logo.png",
+          url: "https://zarble.vercel.app",
+          name: "Zarble",
+          splashImageUrl: "https://zarble.vercel.app/logo.png",
           splashBackgroundColor: "#ffffff",
         },
       },
