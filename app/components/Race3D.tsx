@@ -315,12 +315,6 @@ function Track() {
         <boxGeometry args={[trackWidth + 0.3, trackLength, 0.05]} />
         <meshStandardMaterial color="#ffffff" roughness={0.6} />
       </mesh>
-      
-      {/* Center line - dashed yellow, subtle */}
-      <mesh position={[0, 0.11, -trackLength / 2]} rotation={[-Math.PI / 2, 0, 0]}>
-        <boxGeometry args={[0.05, trackLength, 0.01]} />
-        <meshStandardMaterial color="#fbbf24" roughness={0.3} opacity={0.3} transparent />
-      </mesh>
 
       {/* Track walls as colliders - prevent flying off */}
       <RigidBody type="fixed" position={[trackWidth / 2 + 0.2, 0.4, -trackLength / 2]}>
