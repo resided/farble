@@ -264,14 +264,12 @@ const MarbleRace = () => {
             y: point.y * 0.3 + lookAheadPoint.y * 0.7 // 70% look-ahead, 30% current
           };
           
-          // Camera follows leading racer vertically, centered in viewport
+          // Behind-the-marble camera - follow from behind
           setCameraOffset(prev => {
             const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
             
-          // Top-down camera - center both X and Y
-          const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 400;
-          const targetX = Math.max(0, targetPoint.x - viewportWidth / 2);
-          const targetY = Math.max(0, targetPoint.y - viewportHeight / 2);
+            // Position camera slightly behind the leading marble for "chase cam" effect
+            const targetY = Math.max(0, targetPoint.y - viewportHeight * 0.4); // Show more track ahead
             
             // Very smooth, slow interpolation for cinematic feel (0.03 = very smooth and slow)
             const smoothingFactor = 0.03;
@@ -728,82 +726,51 @@ const MarbleRace = () => {
         </main>
       )}
 
-      {/* Racing Screen - Top-Down Desert View */}
+      {/* Racing Screen - Behind-the-Marble View */}
       {screen === 'racing' && (
-        <main className="flex-1 relative overflow-hidden bg-gradient-to-br from-amber-100 via-yellow-50 to-orange-50">
-          {/* Desert background with texture */}
+        <main className="flex-1 relative overflow-hidden bg-gradient-to-b from-sky-400 via-blue-300 to-emerald-200">
+          {/* Sky and horizon */}
           <div className="absolute inset-0 overflow-hidden">
-            {/* Sandy desert base */}
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-200/80 via-yellow-100/90 to-orange-100/80" />
+            {/* Sky gradient */}
+            <div className="absolute top-0 left-0 w-full h-2/3 bg-gradient-to-b from-blue-400 via-sky-300 to-blue-200" />
             
-            {/* Sand texture pattern */}
-            <div className="absolute inset-0 opacity-30" style={{
-              backgroundImage: `radial-gradient(circle at 20% 30%, rgba(139,69,19,0.1) 0%, transparent 50%),
-                                radial-gradient(circle at 80% 70%, rgba(160,82,45,0.1) 0%, transparent 50%),
-                                radial-gradient(circle at 50% 50%, rgba(184,134,11,0.1) 0%, transparent 50%)`,
-            }} />
+            {/* Ground/road base */}
+            <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-b from-gray-300 via-gray-400 to-gray-500" />
             
-            {/* Desert cacti - scattered around */}
-            {[...Array(8)].map((_, i) => {
-              const positions = [
-                { left: '10%', top: '15%' },
-                { left: '85%', top: '20%' },
-                { left: '15%', top: '60%' },
-                { left: '80%', top: '65%' },
-                { left: '5%', top: '40%' },
-                { left: '90%', top: '45%' },
-                { left: '25%', top: '85%' },
-                { left: '75%', top: '90%' },
-              ];
-              const pos = positions[i % positions.length];
-              return (
-                <div key={i} className="absolute" style={{ left: pos.left, top: pos.top, transform: 'translate(-50%, -50%)' }}>
-                  {/* Cactus body */}
-                  <div className="w-3 h-8 bg-green-700 rounded-full relative">
-                    {/* Cactus arms */}
-                    <div className="absolute -left-2 top-2 w-2 h-4 bg-green-700 rounded-full" />
-                    <div className="absolute -right-2 top-4 w-2 h-5 bg-green-700 rounded-full" />
-                    {/* Shadow */}
-                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-black/20 rounded-full blur-sm" />
-                  </div>
-                </div>
-              );
-            })}
-            
-            {/* Windmill in corner */}
-            <div className="absolute top-8 left-8 w-16 h-16">
-              {/* Windmill base */}
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3 h-12 bg-amber-800 rounded-full" />
-              {/* Windmill head */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-12 bg-amber-700 rounded-full">
-                {/* Blades */}
-                {[0, 90, 180, 270].map((rot, i) => (
+            {/* Road perspective lines for depth */}
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-1/3">
+              {/* Perspective lines converging to horizon */}
+              {[...Array(20)].map((_, i) => {
+                const y = (i / 20) * 100;
+                const width = 100 - (i / 20) * 80;
+                return (
                   <div
                     key={i}
-                    className="absolute top-1/2 left-1/2 w-1 h-6 bg-white origin-top"
-                    style={{ transform: `translate(-50%, -50%) rotate(${rot}deg)` }}
+                    className="absolute left-1/2 -translate-x-1/2 border-t border-white/20"
+                    style={{
+                      bottom: `${y}%`,
+                      width: `${width}%`,
+                    }}
                   />
-                ))}
-              </div>
-              {/* Shadow */}
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-12 h-2 bg-black/20 rounded-full blur-sm" />
+                );
+              })}
             </div>
           </div>
-          {/* Track Container with Camera Tracking - Top-Down View */}
+          {/* Track Container - Simple Side View Track */}
           <div 
             className="absolute inset-0"
             style={{
-              transform: `translate(${-cameraOffset}px, ${-cameraOffset}px) scale(0.6)`,
+              transform: `translateY(${-cameraOffset}px)`,
               willChange: 'transform',
               transition: 'transform 0.1s ease-out',
             }}
           >
-            {/* SVG Track - Top-Down S-Shaped Track */}
+            {/* Simple Straight Track - Side View */}
             <svg 
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-              viewBox="0 0 2000 2000"
-              preserveAspectRatio="xMidYMid meet"
-              style={{ width: '2000px', height: '2000px', pointerEvents: 'none' }}
+              className="absolute bottom-0 left-1/2 -translate-x-1/2"
+              viewBox="0 0 400 4000"
+              preserveAspectRatio="none"
+              style={{ width: '400px', height: '4000px' }}
             >
               <defs>
                 <filter id="trackGlow">
@@ -815,134 +782,42 @@ const MarbleRace = () => {
                 </filter>
               </defs>
               
-              {/* Track path - Top-Down S-Shaped Track with colorful segments */}
+              {/* Simple straight track path - Side view */}
               <path
                 ref={trackPathRef}
-                d="M 200 100 
-                   Q 400 200 600 300
-                   Q 800 400 1000 500
-                   Q 1200 600 1400 700
-                   Q 1600 800 1800 900
-                   Q 1600 1100 1400 1300
-                   Q 1200 1500 1000 1700
-                   Q 800 1800 600 1850
-                   Q 400 1900 200 1950"
+                d="M 200 0 L 200 4000"
                 fill="none"
-                stroke="#374151"
-                strokeWidth="120"
+                stroke="#1f2937"
+                strokeWidth="100"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 id="track-path"
               />
               
-              {/* Colorful track segments */}
+              {/* Track surface */}
               <path
-                d="M 200 100 Q 400 200 600 300"
+                d="M 200 0 L 200 4000"
                 fill="none"
-                stroke="#3b82f6"
-                strokeWidth="100"
+                stroke="#374151"
+                strokeWidth="88"
                 strokeLinecap="round"
-              />
-              <path
-                d="M 600 300 Q 800 400 1000 500"
-                fill="none"
-                stroke="#8b5cf6"
-                strokeWidth="100"
-                strokeLinecap="round"
-              />
-              <path
-                d="M 1000 500 Q 1200 600 1400 700"
-                fill="none"
-                stroke="#ec4899"
-                strokeWidth="100"
-                strokeLinecap="round"
-              />
-              <path
-                d="M 1400 700 Q 1600 800 1800 900"
-                fill="none"
-                stroke="#f59e0b"
-                strokeWidth="100"
-                strokeLinecap="round"
-              />
-              <path
-                d="M 1800 900 Q 1600 1100 1400 1300"
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="100"
-                strokeLinecap="round"
-              />
-              <path
-                d="M 1400 1300 Q 1200 1500 1000 1700"
-                fill="none"
-                stroke="#06b6d4"
-                strokeWidth="100"
-                strokeLinecap="round"
-              />
-              <path
-                d="M 1000 1700 Q 800 1800 600 1850"
-                fill="none"
-                stroke="#f97316"
-                strokeWidth="100"
-                strokeLinecap="round"
-              />
-              <path
-                d="M 600 1850 Q 400 1900 200 1950"
-                fill="none"
-                stroke="#ef4444"
-                strokeWidth="100"
-                strokeLinecap="round"
+                strokeLinejoin="round"
               />
               
-              {/* Track borders - White lines with red dashes */}
+              {/* Track borders - White lines */}
               <path
-                ref={trackPathRef}
-                d="M 200 100 
-                   Q 400 200 600 300
-                   Q 800 400 1000 500
-                   Q 1200 600 1400 700
-                   Q 1600 800 1800 900
-                   Q 1600 1100 1400 1300
-                   Q 1200 1500 1000 1700
-                   Q 800 1800 600 1850
-                   Q 400 1900 200 1950"
+                d="M 200 0 L 200 4000"
                 fill="none"
                 stroke="#ffffff"
-                strokeWidth="130"
+                strokeWidth="76"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 opacity="0.9"
               />
               
-              {/* Red dashed track borders */}
-              <path
-                d="M 200 100 
-                   Q 400 200 600 300
-                   Q 800 400 1000 500
-                   Q 1200 600 1400 700
-                   Q 1600 800 1800 900
-                   Q 1600 1100 1400 1300
-                   Q 1200 1500 1000 1700
-                   Q 800 1800 600 1850
-                   Q 400 1900 200 1950"
-                fill="none"
-                stroke="#ef4444"
-                strokeWidth="8"
-                strokeDasharray="15 10"
-                strokeLinecap="round"
-                opacity="0.8"
-              />
-              
               {/* Center line - Yellow dashed */}
               <path
-                d="M 200 100 
-                   Q 400 200 600 300
-                   Q 800 400 1000 500
-                   Q 1200 600 1400 700
-                   Q 1600 800 1800 900
-                   Q 1600 1100 1400 1300
-                   Q 1200 1500 1000 1700
-                   Q 800 1800 600 1850
-                   Q 400 1900 200 1950"
+                d="M 200 0 L 200 4000"
                 fill="none"
                 stroke="#fbbf24"
                 strokeWidth="6"
@@ -951,27 +826,20 @@ const MarbleRace = () => {
                 opacity="0.9"
               />
               
-              {/* Checkered flags at checkpoints */}
-              {trackPathRef.current && pathLength > 0 && [0.25, 0.5, 0.75].map((checkpoint, i) => {
-                if (!trackPathRef.current) return null;
-                const distance = checkpoint * pathLength;
-                const point = trackPathRef.current.getPointAtLength(distance);
-                const prevPoint = trackPathRef.current.getPointAtLength(Math.max(0, distance - 10));
-                const angle = Math.atan2(point.y - prevPoint.y, point.x - prevPoint.x) * 180 / Math.PI;
-                const perpendicularAngle = angle + 90;
-                
+              {/* Finish line at the end */}
+              {trackPathRef.current && pathLength > 0 && (() => {
+                const finishPoint = trackPathRef.current.getPointAtLength(pathLength);
                 return (
-                  <g key={`checkpoint-${i}`} transform={`translate(${point.x}, ${point.y}) rotate(${perpendicularAngle})`}>
-                    {/* Checkered flag */}
-                    <rect x="-40" y="-60" width="80" height="120" fill="url(#checkerPattern)" opacity="0.9" />
-                    <rect x="-40" y="-60" width="80" height="120" fill="url(#finishGradient)" opacity="0.3" />
-                    {/* Flag pole */}
-                    <line x1="0" y1="-60" x2="0" y2="-80" stroke="#8b4513" strokeWidth="4" />
-                    {/* Label */}
-                    <text x="0" y="70" textAnchor="middle" fill="#000" fontSize="16" fontWeight="bold" opacity="0.8">CHECK</text>
+                  <g transform={`translate(${finishPoint.x}, ${finishPoint.y})`}>
+                    {/* Finish line - horizontal */}
+                    <rect x="-150" y="-15" width="300" height="30" fill="url(#checkerPattern)" opacity="1" />
+                    <rect x="-150" y="-15" width="300" height="30" fill="url(#finishGradient)" opacity="0.4" />
+                    <line x1="-150" y1="0" x2="150" y2="0" stroke="#000" strokeWidth="6" opacity="1" />
+                    <line x1="-150" y1="-3" x2="150" y2="-3" stroke="#fff" strokeWidth="2" opacity="0.8" />
+                    <line x1="-150" y1="3" x2="150" y2="3" stroke="#fff" strokeWidth="2" opacity="0.8" />
                   </g>
                 );
-              })}
+              })()}
               
               {/* Finish Line - At the end of the track */}
               {trackPathRef.current && pathLength > 0 && (() => {
@@ -1028,14 +896,13 @@ const MarbleRace = () => {
               </defs>
             </svg>
             
-            {/* Marbles on Track - Top-Down View - Aligned with SVG */}
+            {/* Marbles on Track - Side View */}
             <div 
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" 
+              className="absolute bottom-0 left-1/2 -translate-x-1/2" 
               style={{ 
-                width: '2000px', 
-                height: '2000px', 
-                pointerEvents: 'none',
-                transform: 'translate(-50%, -50%)'
+                width: '400px', 
+                height: '4000px', 
+                pointerEvents: 'none'
               }}
             >
               {players.map((player, i) => {
@@ -1044,9 +911,9 @@ const MarbleRace = () => {
                 const isLeading = position === Math.max(...marblePositions);
                 
                 // Get exact position on SVG path using getPointAtLength
-                let x = 200; // Track starts at x=200
-                let y = 100; // Track starts at y=100
-                let angle = 0; // Top-down view, no rotation needed initially
+                let x = 200; // Track is centered at x=200
+                let y = 0; // Start at top
+                let angle = 90; // Point down (side view)
                 
                 if (trackPathRef.current && pathLength > 0) {
                   const distanceAlongPath = progress * pathLength;
@@ -1072,9 +939,9 @@ const MarbleRace = () => {
                       zIndex: isLeading ? 20 : 10,
                     }}
                   >
-                    {/* Marble - Top-down view, larger for visibility */}
+                    {/* Marble - Side view, visible from behind */}
                     <div
-                      className="w-16 h-16 rounded-full overflow-hidden relative transition-all duration-75"
+                      className="w-12 h-12 rounded-full overflow-hidden relative transition-all duration-75"
                       style={{
                         background: player.pfpUrl 
                           ? `url(${player.pfpUrl})`
